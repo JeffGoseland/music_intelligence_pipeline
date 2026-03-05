@@ -1,0 +1,37 @@
+# Lightweight CI: format check and tests on push/PR.
+# No CD; this repo produces local artifacts only.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install dev tools (Black, pytest)
+        run: pip install black pytest
+
+      - name: Black (format check)
+        run: black --check src/ scripts/
+
+      - name: Pytest
+        run: pytest tests/ -v --tb=short
