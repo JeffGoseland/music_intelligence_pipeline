@@ -2,7 +2,7 @@
 Enrich step: merge 10 DEAM core features with tempo (BPM), genre, and key from audio.
 
 Produces data/processed/song_features.csv with columns:
-  song_id, spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50,
+  song_id, spectral_centroid, energy, mfcc_coef1, auditory_band_variance, spectral_rolloff50,
   zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity,
   tempo_bpm, genre, key.
 

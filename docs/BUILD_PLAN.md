@@ -25,7 +25,7 @@ Work is split so we don’t do too much at once. Each phase has a **scope**, **o
 | Item | Detail |
 |------|--------|
 | **Scope** | Load audio from a folder, extract acoustic features, write one feature table. No model, no UI. |
-| **Output** | `data/processed/song_features.csv`: **one row per song** = song identifier + acoustic statistics (tempo, spectral_centroid, energy, mfcc_mean, chroma_variance). No audio in the CSV, only IDs and numbers. |
+| **Output** | `data/processed/song_features.csv`: **one row per song** = song identifier + acoustic statistics (tempo, spectral_centroid, energy, mfcc_coef1, auditory_band_variance). No audio in the CSV, only IDs and numbers. |
 | **Depends on** | Nothing (start here). |
 | **Rough effort** | ~1–1.5 h. |
 | **Done when** | You can point the script at `data/raw/` (or your samples path) and get a valid feature table. |

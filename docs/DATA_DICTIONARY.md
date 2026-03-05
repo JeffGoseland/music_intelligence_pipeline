@@ -16,8 +16,8 @@ Defines the schema and meaning of pipeline output files. Use this before Phase 2
 | **song_id** | string | DEAM / audio | Track identifier. From DEAM feature filename stem (e.g. `2.csv` → `2`) and audio filename stem (e.g. `746.mp3` → `746`). Used to join DEAM features with audio-derived fields. |
 | **spectral_centroid** | float | DEAM | Spectral brightness (Hz). Mean over time of `pcm_fftMag_spectralCentroid_sma_amean`. Higher = brighter tone. |
 | **energy** | float | DEAM | Perceptual energy (RMS). Mean over time of `pcm_RMSenergy_sma_amean`. Typical range ~0–1; higher = louder. |
-| **mfcc_mean** | float | DEAM | Mean of first MFCC over time (`pcm_fftMag_mfcc_sma[1]_amean`). Captures coarse spectral shape. |
-| **chroma_variance** | float | DEAM | Variance across 26 filterband (Rfilt) means. Proxy for pitch-class spread; higher = more spread. |
+| **mfcc_coef1** | float | DEAM | MFCC coefficient 1 mean over time (`pcm_fftMag_mfcc_sma[1]_amean`). Single coefficient, not an aggregate across all MFCCs; captures coarse spectral shape. |
+| **auditory_band_variance** | float | DEAM | Variance across 26 OpenSMILE Rfilt (auditory filter-band) means. Timbre/spectral distribution, not chroma (pitch-class). |
 | **spectral_rolloff50** | float | DEAM | Frequency below which 50% of spectral energy lies (Hz). Mean over time of `pcm_fftMag_spectralRollOff50.0_sma_amean`. |
 | **zcr** | float | DEAM | Zero-crossing rate. Mean over time of `pcm_zcr_sma_amean`. Higher often indicates noisiness or percussive content. |
 | **spectral_flux** | float | DEAM | Rate of change of spectrum over time. Mean of `pcm_fftMag_spectralFlux_sma_amean`. |
@@ -35,7 +35,7 @@ Defines the schema and meaning of pipeline output files. Use this before Phase 2
 - `genre`: always `"unknown"` until an external source or classifier is added.
 
 **Source pipeline steps:**
-1. DEAM feature CSVs (`data/deam_csvs/features/*.csv`) → per-song mean (and chroma_variance from Rfilt) → 10 DEAM columns.
+1. DEAM feature CSVs (`data/deam_csvs/features/*.csv`) → per-song mean (and auditory_band_variance from Rfilt) → 10 DEAM columns.
 2. Audio files (`data/audio/*.mp3`) → tempo (librosa), key (chroma + key profiles) → tempo_bpm, key.
 3. Merge on song_id (left join); add genre = "unknown".
 
@@ -95,7 +95,7 @@ The 10 DEAM-derived columns in `song_features.csv` are aggregated from the follo
 - `pcm_fftMag_spectralCentroid_sma_amean`
 - `pcm_RMSenergy_sma_amean`
 - `pcm_fftMag_mfcc_sma[1]_amean`
-- `audSpec_Rfilt_sma[0]_amean` … `audSpec_Rfilt_sma[25]_amean` (chroma_variance = variance of their means)
+- `audSpec_Rfilt_sma[0]_amean` … `audSpec_Rfilt_sma[25]_amean` (auditory_band_variance = variance of their means)
 - `pcm_fftMag_spectralRollOff50.0_sma_amean`
 - `pcm_zcr_sma_amean`
 - `pcm_fftMag_spectralFlux_sma_amean`
@@ -103,4 +103,4 @@ The 10 DEAM-derived columns in `song_features.csv` are aggregated from the follo
 - `pcm_fftMag_spectralEntropy_sma_amean`
 - `pcm_fftMag_spectralHarmonicity_sma_amean`
 
-Aggregation: **mean over time** (all frames in the song’s DEAM feature CSV), except chroma_variance (variance across the 26 Rfilt band means).
+Aggregation: **mean over time** (all frames in the song’s DEAM feature CSV), except auditory_band_variance (variance across the 26 Rfilt band means).

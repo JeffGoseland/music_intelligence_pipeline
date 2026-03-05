@@ -33,8 +33,8 @@ except ImportError:
 FeatureName = Literal[
     "spectral_centroid",
     "energy",
-    "mfcc_mean",
-    "chroma_variance",
+    "mfcc_coef1",
+    "auditory_band_variance",
     "spectral_rolloff50",
     "zcr",
     "spectral_flux",
@@ -48,8 +48,8 @@ FeatureName = Literal[
 FEATURE_COLUMNS: Tuple[FeatureName, ...] = (
     "spectral_centroid",
     "energy",
-    "mfcc_mean",
-    "chroma_variance",
+    "mfcc_coef1",
+    "auditory_band_variance",
     "spectral_rolloff50",
     "zcr",
     "spectral_flux",
@@ -211,7 +211,7 @@ def train_random_forest_models(
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or RF_PARAM_DISTRIBUTIONS
 
-    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val = _load_and_split(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -257,7 +257,7 @@ def train_ridge_models(
     dataset_path = dataset_path or MODELING_DATASET_PATH
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or RIDGE_PARAM_DISTRIBUTIONS
-    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val = _load_and_split(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -297,7 +297,7 @@ def train_elasticnet_models(
     dataset_path = dataset_path or MODELING_DATASET_PATH
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or ELASTICNET_PARAM_DISTRIBUTIONS
-    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val = _load_and_split(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -339,7 +339,7 @@ def train_xgboost_models(
     dataset_path = dataset_path or MODELING_DATASET_PATH
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or XGB_PARAM_DISTRIBUTIONS
-    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val = _load_and_split(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -364,8 +364,8 @@ def _load_and_split(
     models_dir: Path,
     test_size: float,
     random_state: int,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Path]:
-    """Load modeling_dataset and return train/val arrays (same split for both targets)."""
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load modeling_dataset, drop rows with NaN in features, return train/val arrays (same split for both targets)."""
     df = pd.read_csv(dataset_path)
     missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
     if missing:
@@ -376,13 +376,19 @@ def _load_and_split(
     X = df[list(FEATURE_COLUMNS)].to_numpy(dtype=float)
     y_arousal = df["arousal"].to_numpy(dtype=float)
     y_valence = df["valence"].to_numpy(dtype=float)
+    valid = ~np.isnan(X).any(axis=1)
+    if not valid.all():
+        n_dropped = int((~valid).sum())
+        X = X[valid]
+        y_arousal = y_arousal[valid]
+        y_valence = y_valence[valid]
     X_train, X_val, y_ar_train, y_ar_val = train_test_split(
         X, y_arousal, test_size=test_size, random_state=random_state
     )
     _, _, y_val_train, y_val_val = train_test_split(
         X, y_valence, test_size=test_size, random_state=random_state
     )
-    return X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir
+    return X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val
 
 
 def train_all_models(

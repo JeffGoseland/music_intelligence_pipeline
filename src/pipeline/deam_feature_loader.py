@@ -5,8 +5,10 @@ Reads from data/deam_csvs/features/ (one CSV per song, ';' separator).
 Supports minimal (5 + tempo placeholder) or rich (10 DEAM core features) schema.
 
 Rich schema (10 DEAM features, per-song mean over time):
-  spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50,
+  spectral_centroid, energy, mfcc_coef1, auditory_band_variance, spectral_rolloff50,
   zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity.
+  (mfcc_coef1 = MFCC coefficient 1 mean over time; auditory_band_variance = variance
+  across 26 Rfilt filter-band means, from OpenSMILE, not chroma.)
 Tempo, genre, key are added in the enrich step from audio.
 """
 
@@ -32,8 +34,8 @@ COL_SPECTRAL_HARMONICITY = "pcm_fftMag_spectralHarmonicity_sma_amean"
 RICH_DEAM_COLUMNS = [
     "spectral_centroid",
     "energy",
-    "mfcc_mean",
-    "chroma_variance",
+    "mfcc_coef1",
+    "auditory_band_variance",
     "spectral_rolloff50",
     "zcr",
     "spectral_flux",
@@ -67,7 +69,7 @@ def aggregate_one_song(csv_path: Path, rich: bool = False) -> dict | None:
     """
     Read one DEAM feature CSV and aggregate to one row.
 
-    If rich=False: song_id, tempo (NaN), spectral_centroid, energy, mfcc_mean, chroma_variance.
+    If rich=False: song_id, tempo (NaN), spectral_centroid, energy, mfcc_coef1, auditory_band_variance.
     If rich=True: song_id + 10 DEAM features (no tempo; added in enrich step).
     """
     song_id = csv_path.stem
@@ -88,13 +90,13 @@ def aggregate_one_song(csv_path: Path, rich: bool = False) -> dict | None:
 
     row["spectral_centroid"] = _safe_mean(df, COL_SPECTRAL_CENTROID)
     row["energy"] = _safe_mean(df, COL_ENERGY)
-    row["mfcc_mean"] = _safe_mean(df, COL_MFCC)
+    row["mfcc_coef1"] = _safe_mean(df, COL_MFCC)
 
     rfilt_cols = _rfilt_amean_columns(list(df.columns))
     if rfilt_cols:
-        row["chroma_variance"] = float(df[rfilt_cols].mean().var())
+        row["auditory_band_variance"] = float(df[rfilt_cols].mean().var())
     else:
-        row["chroma_variance"] = float("nan")
+        row["auditory_band_variance"] = float("nan")
 
     if rich:
         row["spectral_rolloff50"] = _safe_mean(df, COL_SPECTRAL_ROLLOFF50)
@@ -118,7 +120,7 @@ def run_feature_pipeline(
     """
     Load all DEAM feature CSVs in features_dir, aggregate per song, optionally write CSV.
 
-    rich=False: song_id, tempo (NaN), spectral_centroid, energy, mfcc_mean, chroma_variance.
+    rich=False: song_id, tempo (NaN), spectral_centroid, energy, mfcc_coef1, auditory_band_variance.
     rich=True: song_id + 10 DEAM core features only (for use with enrich step).
     write=False: return DataFrame without writing to disk.
     """
@@ -144,7 +146,7 @@ def run_feature_pipeline(
         df = pd.DataFrame(rows)[["song_id"] + RICH_DEAM_COLUMNS]
     else:
         df = pd.DataFrame(rows)[
-            ["song_id", "tempo", "spectral_centroid", "energy", "mfcc_mean", "chroma_variance"]
+            ["song_id", "tempo", "spectral_centroid", "energy", "mfcc_coef1", "auditory_band_variance"]
         ]
 
     if write:

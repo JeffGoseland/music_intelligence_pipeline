@@ -77,12 +77,12 @@ Raw Audio
 | `tempo` | float | Beats per minute |
 | `spectral_centroid` | float | Spectral brightness (Hz) |
 | `energy` | float | Perceptual energy (e.g. RMS or spectral rolloff-derived) |
-| `mfcc_mean` | float | Summary of MFCCs (e.g. mean of first coefficient across frames) |
-| `chroma_variance` | float | Spread of chroma features (pitch-class distribution) |
+| `mfcc_coef1` | float | MFCC coefficient 1 mean over time (single coefficient) |
+| `auditory_band_variance` | float | Variance across 26 Rfilt filter-band means (timbre; not chroma) |
 
 So the CSV is **song + statistics only** — identifiers and numeric features ready for ML; no embedded audio or long time-series.
 
-**Enrich step (optional):** Run `python scripts/run_enrich_pipeline.py` to produce a **richer** table: **10 DEAM core features** (spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity) plus **tempo (BPM)** and **musical key** extracted from audio, and a **genre** column (set to `unknown`; DEAM has no genre labels). Output: `data/processed/song_features.csv` with 14 columns.
+**Enrich step (optional):** Run `python3 scripts/run_enrich_pipeline.py` to produce a **richer** table: **10 DEAM core features** (spectral_centroid, energy, mfcc_coef1, auditory_band_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity) plus **tempo (BPM)** and **musical key** extracted from audio, and a **genre** column (set to `unknown`; DEAM has no genre labels). Output: `data/processed/song_features.csv` with 14 columns.
 
 **Data dictionary:** Column names, types, sources, and definitions for all pipeline outputs are in **[docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md)**. Consult it before Phase 2 and for downstream use.
 
@@ -115,7 +115,7 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 Phase 2 uses **XGBoost** (one regressor per target) as the **production** emotion model. We also train RandomForest, Ridge, and ElasticNet for comparison; XGBoost consistently gives the best holdout performance.
 
 - **Inputs:** 11 numeric features from `modeling_dataset.csv`:  
-  `spectral_centroid`, `energy`, `mfcc_mean`, `chroma_variance`, `spectral_rolloff50`, `zcr`, `spectral_flux`, `spectral_variance`, `spectral_entropy`, `spectral_harmonicity`, `tempo_bpm`.
+  `spectral_centroid`, `energy`, `mfcc_coef1`, `auditory_band_variance`, `spectral_rolloff50`, `zcr`, `spectral_flux`, `spectral_variance`, `spectral_entropy`, `spectral_harmonicity`, `tempo_bpm`.
 - **Targets:** DEAM **arousal** and **valence** labels (per-song averages).
 - **Training:** 80/20 train/holdout split; **5-fold RandomizedSearchCV** on the training set for hyperparameters; best estimator refit on full training data. Saved models: `models/arousal_xgboost.joblib`, `models/valence_xgboost.joblib`.
 

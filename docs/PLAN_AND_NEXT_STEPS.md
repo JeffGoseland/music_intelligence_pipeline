@@ -55,7 +55,7 @@ Documentation for this layout: `data/README.md` (tracked). Data was copied from 
 
 - **Inputs:** DEAM feature CSVs in `data/deam_csvs/features/` (and optionally raw audio in `data/audio/` if we add librosa extraction later).
 - **Process:** Read each feature CSV, aggregate per song (e.g. mean over time), map DEAM columns to our schema.
-- **Output:** `data/processed/song_features.csv` with columns: `song_id`, `tempo`, `spectral_centroid`, `energy`, `mfcc_mean`, `chroma_variance`.
+- **Output:** `data/processed/song_features.csv` with columns: `song_id`, `tempo`, `spectral_centroid`, `energy`, `mfcc_coef1`, `auditory_band_variance`.
 - **Done when:** One row per song; CSV is the ML feature layer for Phase 2.
 
 ---
@@ -125,10 +125,10 @@ Phase 1 (features)  →  Phase 2 (model)  →  Phase 3 (semantic)  →  Phase 4 
 - [x] DEAM data copied into those folders (audio + CSVs); originals unchanged.
 - [x] `.gitignore` updated so `data/audio/`, `data/deam_csvs/`, `data/processed/` are not committed.
 - [x] `data/README.md` describing the layout (tracked).
-- [x] **Phase 1:** Path config (`src/config/data_paths.py`), DEAM feature loader (`src/pipeline/deam_feature_loader.py`), `data/processed/song_features.csv` (1,802 rows). Run: `python scripts/run_feature_pipeline.py` or `python -m src.pipeline.deam_feature_loader`.
-- [x] **Enrich step:** 10 DEAM core features + tempo (BPM), genre, key. `src/pipeline/deam_feature_loader.py` (rich=True), `src/pipeline/audio_derived_features.py` (tempo + key from audio), `src/pipeline/enrich_song_features.py` (merge + genre). Run: `python scripts/run_enrich_pipeline.py`. Columns: song_id, spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm, genre, key. Genre is "unknown" (DEAM has no genre).
+- [x] **Phase 1:** Path config (`src/config/data_paths.py`), DEAM feature loader (`src/pipeline/deam_feature_loader.py`), `data/processed/song_features.csv` (1,802 rows). Run: `python3 scripts/run_feature_pipeline.py` or `python3 -m src.pipeline.deam_feature_loader`.
+- [x] **Enrich step:** 10 DEAM core features + tempo (BPM), genre, key. `src/pipeline/deam_feature_loader.py` (rich=True), `src/pipeline/audio_derived_features.py` (tempo + key from audio), `src/pipeline/enrich_song_features.py` (merge + genre). Run: `python3 scripts/run_enrich_pipeline.py`. Columns: song_id, spectral_centroid, energy, mfcc_coef1, auditory_band_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm, genre, key. Genre is "unknown" (DEAM has no genre).
 - [x] **Data dictionary:** [docs/DATA_DICTIONARY.md](DATA_DICTIONARY.md) documents all columns in `song_features.csv` (and placeholder for `emotion_predictions.csv`). Required reading before Phase 2.
-- [x] **Validation:** `python scripts/validate_song_features.py` checks schema, row count, duplicates, dtypes, and reports tempo/key coverage. Run after enrich to confirm data before Phase 2.
+- [x] **Validation:** `python3 scripts/validate_song_features.py` checks schema, row count, duplicates, dtypes, and reports tempo/key coverage. Run after enrich to confirm data before Phase 2.
 - [x] **Phase 2 (labels + join):** `src/pipeline/deam_labels_loader.py`, `build_modeling_dataset.py`; `data/processed/deam_labels.csv`, `modeling_dataset.csv`. Validation extended to these files.
 - [x] **Phase 2 (training):** `src/modeling/train_emotion_models.py` — RandomForest, Ridge, ElasticNet, XGBoost with CV hyperparameter tuning. **Production model: XGBoost** (best holdout performance). Run: `python3 scripts/train_emotion_models.py`.
 
