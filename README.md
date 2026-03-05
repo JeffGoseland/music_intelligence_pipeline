@@ -108,38 +108,32 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 | `predicted_valence` | Model output |
 | `emotion_cluster` | (Optional) e.g. calm / energetic / tense / joyful |
 
-### Current baseline model (RandomForest)
+### Production model: XGBoost
 
-Phase 2 currently uses a **RandomForestRegressor** (one model for arousal, one for valence) trained on:
+Phase 2 uses **XGBoost** (one regressor per target) as the **production** emotion model. We also train RandomForest, Ridge, and ElasticNet for comparison; XGBoost consistently gives the best holdout performance.
 
-- **Inputs:** 11 numeric features from `modeling_dataset.csv`  
-  (`spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm`).
-- **Targets:** DEAM **arousal** and **valence** labels aggregated per song.
-- **Training procedure:**  
-  - 80/20 train/holdout split on songs.  
-  - **5-fold RandomizedSearchCV** on the training split to tune RandomForest hyperparameters.  
-  - Best model refit on the full training split; metrics reported on the untouched 20% holdout.
+- **Inputs:** 11 numeric features from `modeling_dataset.csv`:  
+  `spectral_centroid`, `energy`, `mfcc_mean`, `chroma_variance`, `spectral_rolloff50`, `zcr`, `spectral_flux`, `spectral_variance`, `spectral_entropy`, `spectral_harmonicity`, `tempo_bpm`.
+- **Targets:** DEAM **arousal** and **valence** labels (per-song averages).
+- **Training:** 80/20 train/holdout split; **5-fold RandomizedSearchCV** on the training set for hyperparameters; best estimator refit on full training data. Saved models: `models/arousal_xgboost.joblib`, `models/valence_xgboost.joblib`.
 
-On the current DEAM subset (~1,800 songs), the tuned RandomForest achieves on the holdout set:
+**Holdout results (XGBoost, ~1,800 songs):**
 
-- **Arousal:** RMSE ≈ **0.99**, R² ≈ **0.42**, Pearson r ≈ **0.65**  
-- **Valence:** RMSE ≈ **0.93**, R² ≈ **0.40**, Pearson r ≈ **0.63**
+| Target  | RMSE   | R²     | Pearson r |
+|---------|--------|--------|-----------|
+| Arousal | ~0.98  | ~0.43  | ~0.66     |
+| Valence | ~0.93  | ~0.41  | ~0.64     |
 
-Interpretation:
+**Findings from model comparison:**
 
-- RMSE ≈ **1.0** on a **1–9** scale → predictions are typically within about **one point** of the average human rating.  
-- R² ≈ **0.4** → the model explains ~**40% of the variance** in perceived arousal/valence; the rest is listener disagreement and factors not captured by these features.  
-- Pearson r ≈ **0.63–0.65** → predictions track the *ordering* of songs by mood well, which is enough to build **ranked, mood-based playlists and an emotion map**, even if single-song scores are not perfect.
+- **XGBoost** slightly outperforms RandomForest (lower RMSE, higher R² and Pearson r). Both are suitable for ranking and mood buckets.
+- **Ridge** and **ElasticNet** are clearly worse (~0.34–0.37 R²); non-linearity matters for this task.
+- Predictions are **good for relative use** (rank songs by mood, build playlists, emotion maps) and **not for exact 1–9 scores** — typical error is about one point on the scale; ~40% of variance is explained, the rest is label noise and missing signal.
 
-**How to reproduce metrics:**  
-Run `python3 scripts/train_emotion_models.py` from the project root. The script prints a CSV-style summary with RMSE, R², Pearson r, CV RMSE, and the model paths in `models/`.
+**How to train and reproduce metrics:**  
+Run `python3 scripts/train_emotion_models.py` from the project root. The script trains all four model types (RandomForest, Ridge, ElasticNet, XGBoost) with CV tuning and prints a metrics table per type. Trained models are written under `models/` (git-ignored).
 
-**Next planned models (for comparison):**
-
-- **Ridge / ElasticNet Regression:** linear, regularized baselines to show how much non-linearity helps.  
-- **XGBoost / gradient-boosted trees:** stronger tree ensemble to probe the performance ceiling on this feature set.
-
-**Key idea:** The model **enriches the feature store** with semantic predictions for downstream systems.
+**Key idea:** The model **enriches the feature store** with semantic predictions for downstream systems (semantic layer, analyst agent, emotion map).
 
 ---
 

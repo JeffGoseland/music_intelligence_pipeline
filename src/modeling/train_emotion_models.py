@@ -1,9 +1,9 @@
 """
-Train RandomForest models for arousal and valence from modeling_dataset.csv.
+Train emotion models (RandomForest, Ridge, ElasticNet, XGBoost) for arousal and valence.
 
-Reads data/processed/modeling_dataset.csv and fits one RandomForestRegressor
-for each target (arousal, valence). Optional CV-based hyperparameter tuning
-(RandomizedSearchCV). Saves models under models/ and prints metrics.
+Reads data/processed/modeling_dataset.csv. Each model type is trained with
+5-fold RandomizedSearchCV for hyperparameter tuning. Saves models under models/
+and returns metrics for comparison.
 """
 
 from __future__ import annotations
@@ -16,10 +16,18 @@ import numpy as np
 import pandas as pd
 from joblib import dump
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from ..config.data_paths import MODELING_DATASET_PATH, MODELS_DIR
+
+try:
+    from xgboost import XGBRegressor  # type: ignore[import-untyped]
+except ImportError:
+    XGBRegressor = None  # type: ignore[misc, assignment]
 
 
 FeatureName = Literal[
@@ -51,13 +59,38 @@ FEATURE_COLUMNS: Tuple[FeatureName, ...] = (
     "tempo_bpm",
 )
 
-# RandomizedSearchCV param space for RandomForestRegressor
+# RandomizedSearchCV param spaces (expanded for broader search)
 RF_PARAM_DISTRIBUTIONS: Dict[str, Any] = {
-    "n_estimators": [100, 200, 300, 500],
-    "max_depth": [10, 20, 30, None],
-    "min_samples_split": [2, 5, 10],
-    "min_samples_leaf": [1, 2, 4],
-    "max_features": ["sqrt", "log2", 0.5],
+    "n_estimators": [100, 200, 300, 500, 700, 1000],
+    "max_depth": [5, 10, 15, 20, 25, 30, None],
+    "min_samples_split": [2, 5, 10, 15, 20],
+    "min_samples_leaf": [1, 2, 4, 6, 8],
+    "max_features": ["sqrt", "log2", 0.3, 0.5, 0.7],
+    "bootstrap": [True, False],
+    "min_impurity_decrease": [0.0, 1e-5, 1e-4, 1e-3],
+}
+
+RIDGE_PARAM_DISTRIBUTIONS: Dict[str, Any] = {
+    "ridge__alpha": [0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0],
+    "ridge__solver": ["auto", "svd", "cholesky", "lsqr"],
+}
+
+ELASTICNET_PARAM_DISTRIBUTIONS: Dict[str, Any] = {
+    "elasticnet__alpha": [0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0],
+    "elasticnet__l1_ratio": [0.1, 0.2, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0],
+    "elasticnet__max_iter": [1000, 2000, 5000],
+}
+
+XGB_PARAM_DISTRIBUTIONS: Dict[str, Any] = {
+    "n_estimators": [100, 200, 300, 500, 700],
+    "max_depth": [2, 3, 4, 5, 6, 7, 9],
+    "learning_rate": [0.005, 0.01, 0.02, 0.05, 0.1, 0.15],
+    "subsample": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "colsample_bytree": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "min_child_weight": [1, 3, 5, 7],
+    "reg_alpha": [0.001, 0.01, 0.1, 1.0],
+    "reg_lambda": [0.1, 1.0, 5.0, 10.0],
+    "gamma": [0.0, 0.01, 0.1, 0.5, 1.0],
 }
 
 
@@ -100,24 +133,24 @@ def _compute_metrics(
     )
 
 
-def _fit_single_target(
+def _fit_single_target_generic(
     X_train: np.ndarray,
     y_train: np.ndarray,
     X_val: np.ndarray,
     y_val: np.ndarray,
     model_path: Path,
+    base_estimator: Any,
     random_state: int,
     tune_hyperparams: bool,
     cv: int,
     n_iter: int,
-    param_distributions: Dict[str, Any],
+    param_distributions: Dict[str, Any] | None,
 ) -> ModelMetrics:
-    if tune_hyperparams:
-        base = RandomForestRegressor(random_state=random_state, n_jobs=-1)
+    if tune_hyperparams and param_distributions:
         search = RandomizedSearchCV(
-            base,
+            base_estimator,
             param_distributions=param_distributions,
-            n_iter=n_iter,
+            n_iter=min(n_iter, _n_combinations(param_distributions)),
             cv=cv,
             scoring="neg_root_mean_squared_error",
             refit=True,
@@ -129,11 +162,8 @@ def _fit_single_target(
         cv_rmse_mean = float(-search.best_score_)
         best_params = dict(search.best_params_)
     else:
-        model = RandomForestRegressor(
-            n_estimators=300,
-            random_state=random_state,
-            n_jobs=-1,
-        )
+        import sklearn.base
+        model = sklearn.base.clone(base_estimator)
         model.fit(X_train, y_train)
         cv_rmse_mean = None
         best_params = {}
@@ -151,6 +181,13 @@ def _fit_single_target(
     )
 
 
+def _n_combinations(param_distributions: Dict[str, Any]) -> int:
+    n = 1
+    for v in param_distributions.values():
+        n *= len(v) if hasattr(v, "__len__") else 10
+    return n
+
+
 def train_random_forest_models(
     dataset_path: Path | None = None,
     models_dir: Path | None = None,
@@ -158,7 +195,7 @@ def train_random_forest_models(
     random_state: int = 42,
     tune_hyperparams: bool = True,
     cv: int = 5,
-    n_iter: int = 24,
+    n_iter: int = 64,
     param_distributions: Dict[str, Any] | None = None,
 ) -> Dict[str, ModelMetrics]:
     """
@@ -174,56 +211,28 @@ def train_random_forest_models(
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or RF_PARAM_DISTRIBUTIONS
 
-    df = pd.read_csv(dataset_path)
-
-    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing feature columns in modeling dataset: {missing}")
-    for target in ("arousal", "valence"):
-        if target not in df.columns:
-            raise ValueError(f"Missing target column '{target}' in modeling dataset")
-
-    X = df[list(FEATURE_COLUMNS)].to_numpy(dtype=float)
-    y_arousal = df["arousal"].to_numpy(dtype=float)
-    y_valence = df["valence"].to_numpy(dtype=float)
-
-    # Single split: same indices for both targets so train/val are aligned
-    X_train, X_val, y_ar_train, y_ar_val = train_test_split(
-        X,
-        y_arousal,
-        test_size=test_size,
-        random_state=random_state,
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+        dataset_path, models_dir, test_size, random_state
     )
-    _, _, y_val_train, y_val_val = train_test_split(
-        X,
-        y_valence,
-        test_size=test_size,
-        random_state=random_state,
-    )
-
     models_dir.mkdir(parents=True, exist_ok=True)
 
     metrics: Dict[str, ModelMetrics] = {}
 
-    metrics["arousal"] = _fit_single_target(
-        X_train,
-        y_ar_train,
-        X_val,
-        y_ar_val,
+    base_rf = RandomForestRegressor(random_state=random_state, n_jobs=-1)
+    metrics["arousal"] = _fit_single_target_generic(
+        X_train, y_ar_train, X_val, y_ar_val,
         models_dir / "arousal_random_forest.joblib",
+        base_rf,
         random_state=random_state,
         tune_hyperparams=tune_hyperparams,
         cv=cv,
         n_iter=n_iter,
         param_distributions=param_distributions,
     )
-
-    metrics["valence"] = _fit_single_target(
-        X_train,
-        y_val_train,
-        X_val,
-        y_val_val,
+    metrics["valence"] = _fit_single_target_generic(
+        X_train, y_val_train, X_val, y_val_val,
         models_dir / "valence_random_forest.joblib",
+        RandomForestRegressor(random_state=random_state, n_jobs=-1),
         random_state=random_state,
         tune_hyperparams=tune_hyperparams,
         cv=cv,
@@ -232,6 +241,203 @@ def train_random_forest_models(
     )
 
     return metrics
+
+
+def train_ridge_models(
+    dataset_path: Path | None = None,
+    models_dir: Path | None = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    tune_hyperparams: bool = True,
+    cv: int = 5,
+    n_iter: int = 48,
+    param_distributions: Dict[str, Any] | None = None,
+) -> Dict[str, ModelMetrics]:
+    """Train Ridge (L2) regression with StandardScaler; one model per target."""
+    dataset_path = dataset_path or MODELING_DATASET_PATH
+    models_dir = models_dir or MODELS_DIR
+    param_distributions = param_distributions or RIDGE_PARAM_DISTRIBUTIONS
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+        dataset_path, models_dir, test_size, random_state
+    )
+    models_dir.mkdir(parents=True, exist_ok=True)
+    base = Pipeline([
+        ("scaler", StandardScaler()),
+        ("ridge", Ridge(random_state=random_state)),
+    ])
+    return {
+        "arousal": _fit_single_target_generic(
+            X_train, y_ar_train, X_val, y_ar_val,
+            models_dir / "arousal_ridge.joblib",
+            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+        "valence": _fit_single_target_generic(
+            X_train, y_val_train, X_val, y_val_val,
+            models_dir / "valence_ridge.joblib",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("ridge", Ridge(random_state=random_state)),
+            ]),
+            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+    }
+
+
+def train_elasticnet_models(
+    dataset_path: Path | None = None,
+    models_dir: Path | None = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    tune_hyperparams: bool = True,
+    cv: int = 5,
+    n_iter: int = 64,
+    param_distributions: Dict[str, Any] | None = None,
+) -> Dict[str, ModelMetrics]:
+    """Train ElasticNet regression with StandardScaler; one model per target."""
+    dataset_path = dataset_path or MODELING_DATASET_PATH
+    models_dir = models_dir or MODELS_DIR
+    param_distributions = param_distributions or ELASTICNET_PARAM_DISTRIBUTIONS
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+        dataset_path, models_dir, test_size, random_state
+    )
+    models_dir.mkdir(parents=True, exist_ok=True)
+    base = Pipeline([
+        ("scaler", StandardScaler()),
+        ("elasticnet", ElasticNet(random_state=random_state)),
+    ])
+    return {
+        "arousal": _fit_single_target_generic(
+            X_train, y_ar_train, X_val, y_ar_val,
+            models_dir / "arousal_elasticnet.joblib",
+            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+        "valence": _fit_single_target_generic(
+            X_train, y_val_train, X_val, y_val_val,
+            models_dir / "valence_elasticnet.joblib",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("elasticnet", ElasticNet(random_state=random_state)),
+            ]),
+            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+    }
+
+
+def train_xgboost_models(
+    dataset_path: Path | None = None,
+    models_dir: Path | None = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    tune_hyperparams: bool = True,
+    cv: int = 5,
+    n_iter: int = 72,
+    param_distributions: Dict[str, Any] | None = None,
+) -> Dict[str, ModelMetrics]:
+    """Train XGBoost regressors; one model per target. Requires xgboost."""
+    if XGBRegressor is None:
+        raise ImportError("xgboost is required for train_xgboost_models. Install with: pip install xgboost")
+    dataset_path = dataset_path or MODELING_DATASET_PATH
+    models_dir = models_dir or MODELS_DIR
+    param_distributions = param_distributions or XGB_PARAM_DISTRIBUTIONS
+    X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir = _load_and_split(
+        dataset_path, models_dir, test_size, random_state
+    )
+    models_dir.mkdir(parents=True, exist_ok=True)
+    base = XGBRegressor(random_state=random_state, n_jobs=-1)
+    return {
+        "arousal": _fit_single_target_generic(
+            X_train, y_ar_train, X_val, y_ar_val,
+            models_dir / "arousal_xgboost.joblib",
+            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+        "valence": _fit_single_target_generic(
+            X_train, y_val_train, X_val, y_val_val,
+            models_dir / "valence_xgboost.joblib",
+            XGBRegressor(random_state=random_state, n_jobs=-1),
+            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+        ),
+    }
+
+
+def _load_and_split(
+    dataset_path: Path,
+    models_dir: Path,
+    test_size: float,
+    random_state: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, Path]:
+    """Load modeling_dataset and return train/val arrays (same split for both targets)."""
+    df = pd.read_csv(dataset_path)
+    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing feature columns in modeling dataset: {missing}")
+    for target in ("arousal", "valence"):
+        if target not in df.columns:
+            raise ValueError(f"Missing target column '{target}' in modeling dataset")
+    X = df[list(FEATURE_COLUMNS)].to_numpy(dtype=float)
+    y_arousal = df["arousal"].to_numpy(dtype=float)
+    y_valence = df["valence"].to_numpy(dtype=float)
+    X_train, X_val, y_ar_train, y_ar_val = train_test_split(
+        X, y_arousal, test_size=test_size, random_state=random_state
+    )
+    _, _, y_val_train, y_val_val = train_test_split(
+        X, y_valence, test_size=test_size, random_state=random_state
+    )
+    return X_train, X_val, y_ar_train, y_ar_val, y_val_train, y_val_val, models_dir
+
+
+def train_all_models(
+    dataset_path: Path | None = None,
+    models_dir: Path | None = None,
+    test_size: float = 0.2,
+    random_state: int = 42,
+    tune_hyperparams: bool = True,
+    cv: int = 5,
+    n_iter: int = 64,
+    include_xgboost: bool = True,
+) -> Dict[str, Dict[str, ModelMetrics]]:
+    """
+    Train RandomForest, Ridge, ElasticNet, and (optionally) XGBoost with CV tuning.
+    Returns a nested dict: model_type -> { "arousal" -> ModelMetrics, "valence" -> ModelMetrics }.
+    """
+    out: Dict[str, Dict[str, ModelMetrics]] = {}
+    out["random_forest"] = train_random_forest_models(
+        dataset_path=dataset_path,
+        models_dir=models_dir,
+        test_size=test_size,
+        random_state=random_state,
+        tune_hyperparams=tune_hyperparams,
+        cv=cv,
+        n_iter=n_iter,
+    )
+    out["ridge"] = train_ridge_models(
+        dataset_path=dataset_path,
+        models_dir=models_dir,
+        test_size=test_size,
+        random_state=random_state,
+        tune_hyperparams=tune_hyperparams,
+        cv=cv,
+        n_iter=48,
+    )
+    out["elasticnet"] = train_elasticnet_models(
+        dataset_path=dataset_path,
+        models_dir=models_dir,
+        test_size=test_size,
+        random_state=random_state,
+        tune_hyperparams=tune_hyperparams,
+        cv=cv,
+        n_iter=n_iter,
+    )
+    if include_xgboost and XGBRegressor is not None:
+        out["xgboost"] = train_xgboost_models(
+            dataset_path=dataset_path,
+            models_dir=models_dir,
+            test_size=test_size,
+            random_state=random_state,
+            tune_hyperparams=tune_hyperparams,
+            cv=cv,
+            n_iter=n_iter,
+        )
+    return out
 
 
 def format_metrics_table(metrics: Dict[str, ModelMetrics]) -> str:
@@ -249,4 +455,14 @@ def format_metrics_table(metrics: Dict[str, ModelMetrics]) -> str:
         if m.best_params:
             lines.append(f"  {target} best_params: {m.best_params}")
     return "\n".join(lines)
+
+
+def format_all_metrics_table(all_metrics: Dict[str, Dict[str, ModelMetrics]]) -> str:
+    """Format metrics for all model types (RandomForest, Ridge, ElasticNet, XGBoost)."""
+    sections = []
+    for model_name, metrics in all_metrics.items():
+        sections.append(f"--- {model_name} ---")
+        sections.append(format_metrics_table(metrics))
+        sections.append("")
+    return "\n".join(sections).strip()
 

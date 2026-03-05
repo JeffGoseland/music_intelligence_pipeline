@@ -210,3 +210,6 @@ __marimo__/
 data/audio/
 data/deam_csvs/
 data/processed/
+
+# Trained models (reproduce with scripts/train_emotion_models.py)
+models/

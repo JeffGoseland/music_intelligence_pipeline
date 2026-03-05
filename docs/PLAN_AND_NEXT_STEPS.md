@@ -129,6 +129,8 @@ Phase 1 (features)  →  Phase 2 (model)  →  Phase 3 (semantic)  →  Phase 4 
 - [x] **Enrich step:** 10 DEAM core features + tempo (BPM), genre, key. `src/pipeline/deam_feature_loader.py` (rich=True), `src/pipeline/audio_derived_features.py` (tempo + key from audio), `src/pipeline/enrich_song_features.py` (merge + genre). Run: `python scripts/run_enrich_pipeline.py`. Columns: song_id, spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm, genre, key. Genre is "unknown" (DEAM has no genre).
 - [x] **Data dictionary:** [docs/DATA_DICTIONARY.md](DATA_DICTIONARY.md) documents all columns in `song_features.csv` (and placeholder for `emotion_predictions.csv`). Required reading before Phase 2.
 - [x] **Validation:** `python scripts/validate_song_features.py` checks schema, row count, duplicates, dtypes, and reports tempo/key coverage. Run after enrich to confirm data before Phase 2.
+- [x] **Phase 2 (labels + join):** `src/pipeline/deam_labels_loader.py`, `build_modeling_dataset.py`; `data/processed/deam_labels.csv`, `modeling_dataset.csv`. Validation extended to these files.
+- [x] **Phase 2 (training):** `src/modeling/train_emotion_models.py` — RandomForest, Ridge, ElasticNet, XGBoost with CV hyperparameter tuning. **Production model: XGBoost** (best holdout performance). Run: `python3 scripts/train_emotion_models.py`.
 
 ---
 
@@ -136,13 +138,14 @@ Phase 1 (features)  →  Phase 2 (model)  →  Phase 3 (semantic)  →  Phase 4 
 
 1. ~~**Phase 1 — Feature pipeline**~~ **Done.**
 
-2. **Phase 2 — Emotion model**  
-   - Load `song_features.csv` and DEAM annotations from `data/deam_csvs/annotations/`.  
-   - Train arousal/valence model; evaluate; write `emotion_predictions.csv`.  
-   - **Checkpoint:** Confirm predictions table; then Phase 3 (and optionally Phase 5 in parallel).
+2. ~~**Phase 2 — Emotion model**~~ **Done.**  
+   - DEAM labels → `deam_labels.csv`; join with `song_features.csv` → `modeling_dataset.csv`.  
+   - Trained **RandomForest, Ridge, ElasticNet, XGBoost** with 5-fold RandomizedSearchCV; **XGBoost** chosen as production model (best holdout RMSE/R²/Pearson r).  
+   - Models saved under `models/` (arousal/valence XGBoost: `arousal_xgboost.joblib`, `valence_xgboost.joblib`).  
+   - **Next:** Generate `emotion_predictions.csv` for all songs using XGBoost; then Phase 3 (semantic layer) and optionally Phase 5 (viz).
 
 3. **Phases 3 → 4 → 5 → 6**  
    - Follow BUILD_PLAN: semantic layer → AI analyst agent → visualization → polish.  
    - Checkpoint after each phase.
 
-**Recommended next action:** Start Phase 2 — emotion model (train arousal/valence from `song_features.csv` + DEAM annotations → `emotion_predictions.csv`).
+**Recommended next action:** Add prediction pipeline that loads XGBoost models and writes `emotion_predictions.csv`; then Phase 3 (semantic layer).
