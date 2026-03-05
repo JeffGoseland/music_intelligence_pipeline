@@ -73,18 +73,18 @@ Defines the schema and meaning of pipeline output files. Use this before Phase 2
 
 ## File: `data/processed/emotion_predictions.csv` (Phase 2)
 
-**Purpose:** One row per song; predicted arousal and valence (and optional emotion cluster). Produced by Phase 2 emotion model.
+**Purpose:** One row per song; predicted arousal and valence from the production XGBoost model. Produced by the Phase 2 prediction step (`run_emotion_predictions`).
 
-**Planned columns (to be updated after Phase 2):**
+**Row count:** One per row in `song_features.csv` (same set of songs).  
+**Primary key:** `song_id`.
 
 | Column | Type | Source | Description |
 |--------|------|--------|-------------|
-| **song_id** | string | Join key | Same as in song_features.csv. |
-| **predicted_arousal** | float | Model | Predicted arousal (energy/intensity). |
-| **predicted_valence** | float | Model | Predicted valence (positive vs negative). |
-| **emotion_cluster** | string | Optional | Label such as calm / energetic / tense / joyful. |
+| **song_id** | string | song_features | Track identifier; matches song_features.csv. |
+| **predicted_arousal** | float | XGBoost model | Predicted arousal (energy/intensity). Scale comparable to DEAM 1–9. |
+| **predicted_valence** | float | XGBoost model | Predicted valence (positive vs negative). Scale comparable to DEAM 1–9. |
 
-*(This section will be filled in when Phase 2 is implemented.)*
+**Source:** `scripts/run_emotion_predictions.py` loads `song_features.csv`, runs `models/arousal_xgboost.joblib` and `models/valence_xgboost.joblib` on the 11 feature columns, and writes this file. Train models first with `python3 scripts/train_emotion_models.py`.
 
 ---
 

@@ -1,9 +1,10 @@
 """
-Validate data/processed/song_features.csv, deam_labels.csv, and modeling_dataset.csv.
+Validate data/processed/song_features.csv, deam_labels.csv, modeling_dataset.csv, emotion_predictions.csv.
 
 Song features: required columns, dtypes, row count, duplicate song_id, NaN counts,
 tempo/key coverage. DEAM labels: song_id, arousal, valence; no duplicates; numeric.
-Modeling dataset: song_features columns + arousal, valence; inner-join consistency.
+Modeling dataset: song_features columns + arousal, valence. Emotion predictions:
+song_id, predicted_arousal, predicted_valence; row count matches song_features; no NaN.
 """
 
 from pathlib import Path
@@ -217,6 +218,62 @@ def validate_modeling_dataset(csv_path: Path | None = None) -> tuple[bool, list[
     return len(errors) == 0, errors, info
 
 
+EMOTION_PREDICTIONS_REQUIRED = ["song_id", "predicted_arousal", "predicted_valence"]
+
+
+def _default_emotion_predictions_path() -> Path:
+    try:
+        from ..config.data_paths import EMOTION_PREDICTIONS_PATH
+        return EMOTION_PREDICTIONS_PATH
+    except ImportError:
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return project_root / "data" / "processed" / "emotion_predictions.csv"
+
+
+def validate_emotion_predictions(
+    csv_path: Path | None = None,
+    song_features_path: Path | None = None,
+) -> tuple[bool, list[str], list[str]]:
+    """Validate emotion_predictions.csv. Optionally check row count matches song_features."""
+    csv_path = csv_path or _default_emotion_predictions_path()
+    errors: list[str] = []
+    info: list[str] = []
+
+    if not csv_path.exists():
+        errors.append(f"File not found: {csv_path}")
+        return False, errors
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        errors.append(f"Could not read CSV: {e}")
+        return False, errors
+
+    missing = [c for c in EMOTION_PREDICTIONS_REQUIRED if c not in df.columns]
+    if missing:
+        errors.append(f"Missing columns: {missing}")
+    if len(df) == 0:
+        errors.append("Table is empty")
+    else:
+        info.append(f"Row count: {len(df)}")
+    if "song_id" in df.columns and df["song_id"].duplicated().any():
+        errors.append(f"Duplicate song_id: {df['song_id'].duplicated().sum()} rows")
+    for col in ("predicted_arousal", "predicted_valence"):
+        if col in df.columns:
+            if not pd.api.types.is_numeric_dtype(df[col]):
+                errors.append(f"Column '{col}' should be numeric, got {df[col].dtype}")
+            elif df[col].isna().any():
+                errors.append(f"Column '{col}' has {df[col].isna().sum()} NaN values")
+    if song_features_path and song_features_path.exists() and "song_id" in df.columns:
+        try:
+            sf = pd.read_csv(song_features_path)
+            if len(sf) != len(df):
+                errors.append(f"Row count {len(df)} does not match song_features.csv ({len(sf)})")
+        except Exception:
+            pass
+    return len(errors) == 0, errors, info
+
+
 def main() -> int:
     """Run validation for song_features, then deam_labels and modeling_dataset if present. Return 0 if all passed, 1 otherwise."""
     all_passed = True
@@ -261,6 +318,20 @@ def main() -> int:
             for m in info:
                 print("  ", m)
         print("modeling_dataset: PASSED" if passed else "modeling_dataset: FAILED")
+
+    # 4) emotion_predictions (Phase 2)
+    ep_path = _default_emotion_predictions_path()
+    if ep_path.exists():
+        print("\n--- emotion_predictions.csv ---")
+        passed, errors, info = validate_emotion_predictions(ep_path, song_features_path=sf_path)
+        if errors:
+            for m in errors:
+                print("  Error:", m)
+            all_passed = False
+        if info:
+            for m in info:
+                print("  ", m)
+        print("emotion_predictions: PASSED" if passed else "emotion_predictions: FAILED")
 
     print("\nOverall:", "PASSED" if all_passed else "FAILED")
     return 0 if all_passed else 1
