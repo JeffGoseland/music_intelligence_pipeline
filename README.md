@@ -74,7 +74,9 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 
 **Validation:** After building or re-running enrich, run `python3 scripts/validate_song_features.py` to check schema, row count, and tempo/key coverage.
 
-**Run from start to finish:** To rebuild all pipeline outputs and validate in one go (enrich → labels + join → train models → emotion_predictions → validate), run `python3 scripts/run_full_pipeline.py` from the project root. Requires `data/audio/`, `data/deam_csvs/` to be populated; takes several minutes (audio processing + model training).
+**Run from start to finish:** To rebuild all pipeline outputs and validate in one go (enrich → labels + join → train models → emotion_predictions → validate), run `python3 scripts/run_full_pipeline.py` from the project root. Requires `data/audio/`, `data/deam_csvs/` to be populated; takes several minutes (audio processing + model training). A run manifest is written to `data/processed/pipeline_run.json` for traceability.
+
+**MLOps:** Pipeline stages (feature engineering, model generation), artifact paths, validation gates, and how to run individual steps are in **[docs/MLOPS.md](docs/MLOPS.md)**.
 
 **Key idea:** This table is the **ML feature layer**, reusable across models.
 
@@ -129,12 +131,7 @@ Run `python3 scripts/train_emotion_models.py` from the project root. The script 
 
 **Goal:** Translate ML outputs into interpretable musical concepts.
 
-Define attributes and rules, for example:
-
-- **High Energy** — arousal above threshold.
-- **Calm Focus** — low arousal + positive valence.
-- **Dramatic Music** — high arousal + low valence.
-- **Joyful Music** — high valence + moderate arousal.
+**Tag set and rules:** The semantic layer uses **6 tags + Neutral** derived from predicted arousal and valence (scale ~1–9). Tag definitions, thresholds (e.g. High Energy: arousal ≥ 6; Calm Focus: arousal ≤ 4 and valence ≥ 5), and usage (filter by tag, list tags) are in **[docs/SEMANTIC_LAYER.md](docs/SEMANTIC_LAYER.md)**. Songs can have multiple tags.
 
 **Responsibilities:** Define business logic, standardize attributes, act as **translation layer** for AI systems.
 

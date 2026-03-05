@@ -56,13 +56,13 @@ def validate_song_features(csv_path: Path | None = None) -> tuple[bool, list[str
 
     if not csv_path.exists():
         errors.append(f"File not found: {csv_path}")
-        return False, errors
+        return False, errors, []
 
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:
         errors.append(f"Could not read CSV: {e}")
-        return False, errors
+        return False, errors, []
 
     # Schema: required columns present
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
@@ -154,13 +154,13 @@ def validate_deam_labels(csv_path: Path | None = None) -> tuple[bool, list[str],
 
     if not csv_path.exists():
         errors.append(f"File not found: {csv_path}")
-        return False, errors
+        return False, errors, []
 
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:
         errors.append(f"Could not read CSV: {e}")
-        return False, errors
+        return False, errors, []
 
     missing = [c for c in DEAM_LABELS_COLUMNS if c not in df.columns]
     if missing:
@@ -194,13 +194,13 @@ def validate_modeling_dataset(csv_path: Path | None = None) -> tuple[bool, list[
 
     if not csv_path.exists():
         errors.append(f"File not found: {csv_path}")
-        return False, errors
+        return False, errors, []
 
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:
         errors.append(f"Could not read CSV: {e}")
-        return False, errors
+        return False, errors, []
 
     required = REQUIRED_COLUMNS + ["arousal", "valence"]
     missing = [c for c in required if c not in df.columns]
@@ -241,13 +241,13 @@ def validate_emotion_predictions(
 
     if not csv_path.exists():
         errors.append(f"File not found: {csv_path}")
-        return False, errors
+        return False, errors, []
 
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:
         errors.append(f"Could not read CSV: {e}")
-        return False, errors
+        return False, errors, []
 
     missing = [c for c in EMOTION_PREDICTIONS_REQUIRED if c not in df.columns]
     if missing:

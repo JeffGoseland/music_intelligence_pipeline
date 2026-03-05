@@ -376,7 +376,7 @@ def _load_and_split(
     X = df[list(FEATURE_COLUMNS)].to_numpy(dtype=float)
     y_arousal = df["arousal"].to_numpy(dtype=float)
     y_valence = df["valence"].to_numpy(dtype=float)
-    valid = ~np.isnan(X).any(axis=1)
+    valid = (~np.isnan(X).any(axis=1)) & ~np.isnan(y_arousal) & ~np.isnan(y_valence)
     if not valid.all():
         n_dropped = int((~valid).sum())
         X = X[valid]
