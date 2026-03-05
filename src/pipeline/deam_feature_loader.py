@@ -146,7 +146,14 @@ def run_feature_pipeline(
         df = pd.DataFrame(rows)[["song_id"] + RICH_DEAM_COLUMNS]
     else:
         df = pd.DataFrame(rows)[
-            ["song_id", "tempo", "spectral_centroid", "energy", "mfcc_coef1", "auditory_band_variance"]
+            [
+                "song_id",
+                "tempo",
+                "spectral_centroid",
+                "energy",
+                "mfcc_coef1",
+                "auditory_band_variance",
+            ]
         ]
 
     if write:
@@ -158,6 +165,7 @@ def run_feature_pipeline(
 
 if __name__ == "__main__":
     from ..config.data_paths import SONG_FEATURES_PATH
+
     df = run_feature_pipeline(output_path=SONG_FEATURES_PATH)
     print(f"Wrote {len(df)} rows to {SONG_FEATURES_PATH}", file=sys.stderr)
     print(df.head())

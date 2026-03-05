@@ -1,4 +1,5 @@
 """Add project root to sys.path so scripts can be run from any cwd."""
+
 import sys
 from pathlib import Path
 

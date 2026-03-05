@@ -13,10 +13,12 @@ import pandas as pd
 # Krumhansl-Schmuckler key profiles (12 pitch classes C, C#, D, ..., B)
 # Order matches librosa chroma: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
 _MAJOR_RAW = np.array(
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=float
+    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88],
+    dtype=float,
 )
 _MINOR_RAW = np.array(
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=float
+    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17],
+    dtype=float,
 )
 # Normalize to unit norm so cosine similarity is in [0, 1]
 MAJOR_PROFILE = _MAJOR_RAW / (np.linalg.norm(_MAJOR_RAW) + 1e-12)
@@ -81,7 +83,9 @@ def _chroma_vector_for_key(y: np.ndarray, sr: int) -> np.ndarray | None:
 
     # 1) chroma_stft (most portable)
     try:
-        chroma = librosa.feature.chroma_stft(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        chroma = librosa.feature.chroma_stft(
+            y=y, sr=sr, hop_length=hop, n_chroma=n_chroma
+        )
         out = make_vector(chroma)
         if out is not None:
             return out
@@ -90,7 +94,9 @@ def _chroma_vector_for_key(y: np.ndarray, sr: int) -> np.ndarray | None:
 
     # 2) chroma_cqt (often better for key, can fail on some systems)
     try:
-        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        chroma = librosa.feature.chroma_cqt(
+            y=y, sr=sr, hop_length=hop, n_chroma=n_chroma
+        )
         out = make_vector(chroma)
         if out is not None:
             return out
@@ -99,7 +105,9 @@ def _chroma_vector_for_key(y: np.ndarray, sr: int) -> np.ndarray | None:
 
     # 3) chroma_cens (smoother, different backend)
     try:
-        chroma = librosa.feature.chroma_cens(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        chroma = librosa.feature.chroma_cens(
+            y=y, sr=sr, hop_length=hop, n_chroma=n_chroma
+        )
         out = make_vector(chroma)
         if out is not None:
             return out
@@ -109,7 +117,9 @@ def _chroma_vector_for_key(y: np.ndarray, sr: int) -> np.ndarray | None:
     return None
 
 
-def extract_tempo_and_key(audio_path: Path, sr: int = 22050, duration: float = 45.0) -> dict:
+def extract_tempo_and_key(
+    audio_path: Path, sr: int = 22050, duration: float = 45.0
+) -> dict:
     """
     Extract tempo (BPM) and key from one audio file.
     Returns dict with song_id, tempo_bpm, key. Uses first `duration` seconds for speed.

@@ -40,13 +40,16 @@ def _default_csv_path() -> Path:
     """Resolve song_features.csv path so the module works when run as script or as package."""
     try:
         from ..config.data_paths import SONG_FEATURES_PATH
+
         return SONG_FEATURES_PATH
     except ImportError:
         project_root = Path(__file__).resolve().parent.parent.parent
         return project_root / "data" / "processed" / "song_features.csv"
 
 
-def validate_song_features(csv_path: Path | None = None) -> tuple[bool, list[str], list[str]]:
+def validate_song_features(
+    csv_path: Path | None = None,
+) -> tuple[bool, list[str], list[str]]:
     """
     Validate song_features.csv. Returns (all_passed, errors, info_messages).
     """
@@ -86,7 +89,11 @@ def validate_song_features(csv_path: Path | None = None) -> tuple[bool, list[str
             errors.append(f"Duplicate song_id: {n} rows")
 
     # Dtypes: song_id and genre, key can be object/string; rest numeric
-    if "song_id" in df.columns and not pd.api.types.is_string_dtype(df["song_id"]) and not pd.api.types.is_object_dtype(df["song_id"]):
+    if (
+        "song_id" in df.columns
+        and not pd.api.types.is_string_dtype(df["song_id"])
+        and not pd.api.types.is_object_dtype(df["song_id"])
+    ):
         info.append("song_id is not string/object (may be numeric IDs)")
     for col in NUMERIC_FEATURE_COLUMNS + ["tempo_bpm"]:
         if col not in df.columns:
@@ -112,18 +119,24 @@ def validate_song_features(csv_path: Path | None = None) -> tuple[bool, list[str
         if n_valid > 0:
             out = ((valid_tempo < TEMPO_MIN) | (valid_tempo > TEMPO_MAX)).sum()
             if out > 0:
-                info.append(f"tempo_bpm: {out} values outside {TEMPO_MIN}-{TEMPO_MAX} BPM")
+                info.append(
+                    f"tempo_bpm: {out} values outside {TEMPO_MIN}-{TEMPO_MAX} BPM"
+                )
 
     # Key: report coverage
     key_pct = 0.0
     if "key" in df.columns:
-        known = (df["key"].astype(str).str.strip() != "") & (df["key"].astype(str).str.lower() != "unknown")
+        known = (df["key"].astype(str).str.strip() != "") & (
+            df["key"].astype(str).str.lower() != "unknown"
+        )
         n_known = known.sum()
         key_pct = 100 * n_known / len(df) if len(df) else 0
         info.append(f"key: {n_known} non-unknown ({key_pct:.1f}%)")
 
     # Data quality: require some audio-derived data (enrich step must have run successfully)
-    if len(df) > 0 and (tempo_pct < MIN_TEMPO_COVERAGE_PCT or key_pct < MIN_KEY_COVERAGE_PCT):
+    if len(df) > 0 and (
+        tempo_pct < MIN_TEMPO_COVERAGE_PCT or key_pct < MIN_KEY_COVERAGE_PCT
+    ):
         errors.append(
             "Audio-derived data missing or failed: tempo_bpm and/or key are all empty or unknown. "
             "Re-run: python scripts/run_enrich_pipeline.py (ensure data/audio/ has MP3s and librosa can load them)."
@@ -140,13 +153,16 @@ DEAM_LABELS_COLUMNS = ["song_id", "arousal", "valence"]
 def _default_deam_labels_path() -> Path:
     try:
         from ..config.data_paths import DEAM_LABELS_PATH
+
         return DEAM_LABELS_PATH
     except ImportError:
         project_root = Path(__file__).resolve().parent.parent.parent
         return project_root / "data" / "processed" / "deam_labels.csv"
 
 
-def validate_deam_labels(csv_path: Path | None = None) -> tuple[bool, list[str], list[str]]:
+def validate_deam_labels(
+    csv_path: Path | None = None,
+) -> tuple[bool, list[str], list[str]]:
     """Validate deam_labels.csv. Returns (all_passed, errors, info_messages)."""
     csv_path = csv_path or _default_deam_labels_path()
     errors: list[str] = []
@@ -180,13 +196,16 @@ def validate_deam_labels(csv_path: Path | None = None) -> tuple[bool, list[str],
 def _default_modeling_dataset_path() -> Path:
     try:
         from ..config.data_paths import MODELING_DATASET_PATH
+
         return MODELING_DATASET_PATH
     except ImportError:
         project_root = Path(__file__).resolve().parent.parent.parent
         return project_root / "data" / "processed" / "modeling_dataset.csv"
 
 
-def validate_modeling_dataset(csv_path: Path | None = None) -> tuple[bool, list[str], list[str]]:
+def validate_modeling_dataset(
+    csv_path: Path | None = None,
+) -> tuple[bool, list[str], list[str]]:
     """Validate modeling_dataset.csv (song_features + arousal, valence). Returns (all_passed, errors, info)."""
     csv_path = csv_path or _default_modeling_dataset_path()
     errors: list[str] = []
@@ -224,6 +243,7 @@ EMOTION_PREDICTIONS_REQUIRED = ["song_id", "predicted_arousal", "predicted_valen
 def _default_emotion_predictions_path() -> Path:
     try:
         from ..config.data_paths import EMOTION_PREDICTIONS_PATH
+
         return EMOTION_PREDICTIONS_PATH
     except ImportError:
         project_root = Path(__file__).resolve().parent.parent.parent
@@ -268,7 +288,9 @@ def validate_emotion_predictions(
         try:
             sf = pd.read_csv(song_features_path)
             if len(sf) != len(df):
-                errors.append(f"Row count {len(df)} does not match song_features.csv ({len(sf)})")
+                errors.append(
+                    f"Row count {len(df)} does not match song_features.csv ({len(sf)})"
+                )
         except Exception:
             pass
     return len(errors) == 0, errors, info
@@ -323,7 +345,9 @@ def main() -> int:
     ep_path = _default_emotion_predictions_path()
     if ep_path.exists():
         print("\n--- emotion_predictions.csv ---")
-        passed, errors, info = validate_emotion_predictions(ep_path, song_features_path=sf_path)
+        passed, errors, info = validate_emotion_predictions(
+            ep_path, song_features_path=sf_path
+        )
         if errors:
             for m in errors:
                 print("  Error:", m)
@@ -331,7 +355,9 @@ def main() -> int:
         if info:
             for m in info:
                 print("  ", m)
-        print("emotion_predictions: PASSED" if passed else "emotion_predictions: FAILED")
+        print(
+            "emotion_predictions: PASSED" if passed else "emotion_predictions: FAILED"
+        )
 
     print("\nOverall:", "PASSED" if all_passed else "FAILED")
     return 0 if all_passed else 1

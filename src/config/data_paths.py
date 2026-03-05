@@ -34,7 +34,8 @@ def get_latest_models_dir() -> Path:
     if not MODELS_DIR.exists():
         return MODELS_DIR
     subdirs = [
-        d.name for d in MODELS_DIR.iterdir()
+        d.name
+        for d in MODELS_DIR.iterdir()
         if d.is_dir() and RUN_ID_PATTERN.match(d.name)
     ]
     if not subdirs:

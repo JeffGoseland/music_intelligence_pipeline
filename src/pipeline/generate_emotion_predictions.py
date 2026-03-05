@@ -55,11 +55,13 @@ def run_emotion_predictions(
     pred_arousal = arousal_model.predict(X)
     pred_valence = valence_model.predict(X)
 
-    out = pd.DataFrame({
-        "song_id": df["song_id"].astype(str),
-        "predicted_arousal": pred_arousal,
-        "predicted_valence": pred_valence,
-    })
+    out = pd.DataFrame(
+        {
+            "song_id": df["song_id"].astype(str),
+            "predicted_arousal": pred_arousal,
+            "predicted_valence": pred_valence,
+        }
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(output_path, index=False)
     return out

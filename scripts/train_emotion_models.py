@@ -27,7 +27,9 @@ def _get_git_hash() -> str:
 
 
 def main() -> int:
-    print("Training RandomForest, Ridge, ElasticNet, and XGBoost (arousal + valence each)...")
+    print(
+        "Training RandomForest, Ridge, ElasticNet, and XGBoost (arousal + valence each)..."
+    )
     all_metrics, run_id, versioned_dir = train_all_models()
     print()
     table = format_all_metrics_table(all_metrics)

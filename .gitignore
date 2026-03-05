@@ -213,3 +213,4 @@ data/processed/
 
 # Trained models (reproduce with scripts/train_emotion_models.py)
 models/
+.DS_Store

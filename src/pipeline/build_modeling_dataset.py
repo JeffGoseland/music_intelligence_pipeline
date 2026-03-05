@@ -33,7 +33,9 @@ def run_build_modeling_dataset(
     labels = pd.read_csv(deam_labels_path)
     features["song_id"] = features["song_id"].astype(str)
     labels["song_id"] = labels["song_id"].astype(str)
-    merged = features.merge(labels[["song_id", "arousal", "valence"]], on="song_id", how="inner")
+    merged = features.merge(
+        labels[["song_id", "arousal", "valence"]], on="song_id", how="inner"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(output_path, index=False)
     return merged

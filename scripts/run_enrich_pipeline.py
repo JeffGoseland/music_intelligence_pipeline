@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run enrich: 10 DEAM features + tempo, genre, key → song_features.csv. Run from project root."""
+
 import sys
 from pathlib import Path
 

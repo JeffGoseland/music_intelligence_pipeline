@@ -11,10 +11,11 @@ Output: data/processed/deam_labels.csv with columns song_id, arousal, valence.
 from pathlib import Path
 import pandas as pd
 
-
 # Subpaths under ANNOTATIONS_DIR (DEAM layout)
 SONG_LEVEL_SUBDIR = Path("annotations averaged per song") / "song_level"
-DYNAMIC_SUBDIR = Path("annotations averaged per song") / "dynamic (per second annotations)"
+DYNAMIC_SUBDIR = (
+    Path("annotations averaged per song") / "dynamic (per second annotations)"
+)
 STATIC_GLOB = "static_annotations_averaged_songs_*.csv"
 
 
@@ -113,21 +114,25 @@ def _load_dynamic_aggregated(annotations_dir: Path) -> pd.DataFrame | None:
             valence_means = va_df[ar_df.columns[1:]].mean(axis=0)
         else:
             valence_means = va_df.iloc[:, 1:].mean(axis=0)
-        out = pd.DataFrame({
-            "song_id": song_ids,
-            "arousal": arousal_means.values,
-            "valence": valence_means.values,
-        })
+        out = pd.DataFrame(
+            {
+                "song_id": song_ids,
+                "arousal": arousal_means.values,
+                "valence": valence_means.values,
+            }
+        )
     else:
         # Rows = songs, first column = song_id
         ar_df = ar_df.set_index(ar_df.columns[0])
         va_df = va_df.set_index(va_df.columns[0])
         common = ar_df.index.intersection(va_df.index)
-        out = pd.DataFrame({
-            "song_id": [str(s).strip() for s in common],
-            "arousal": ar_df.loc[common].mean(axis=1).values,
-            "valence": va_df.loc[common].mean(axis=1).values,
-        })
+        out = pd.DataFrame(
+            {
+                "song_id": [str(s).strip() for s in common],
+                "arousal": ar_df.loc[common].mean(axis=1).values,
+                "valence": va_df.loc[common].mean(axis=1).values,
+            }
+        )
     return out.dropna(subset=["arousal", "valence"])
 
 

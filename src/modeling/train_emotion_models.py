@@ -164,6 +164,7 @@ def _fit_single_target_generic(
         best_params = dict(search.best_params_)
     else:
         import sklearn.base
+
         model = sklearn.base.clone(base_estimator)
         model.fit(X_train, y_train)
         cv_rmse_mean = None
@@ -221,7 +222,10 @@ def train_random_forest_models(
 
     base_rf = RandomForestRegressor(random_state=random_state, n_jobs=-1)
     metrics["arousal"] = _fit_single_target_generic(
-        X_train, y_ar_train, X_val, y_ar_val,
+        X_train,
+        y_ar_train,
+        X_val,
+        y_ar_val,
         models_dir / "arousal_random_forest.joblib",
         base_rf,
         random_state=random_state,
@@ -231,7 +235,10 @@ def train_random_forest_models(
         param_distributions=param_distributions,
     )
     metrics["valence"] = _fit_single_target_generic(
-        X_train, y_val_train, X_val, y_val_val,
+        X_train,
+        y_val_train,
+        X_val,
+        y_val_val,
         models_dir / "valence_random_forest.joblib",
         RandomForestRegressor(random_state=random_state, n_jobs=-1),
         random_state=random_state,
@@ -262,24 +269,43 @@ def train_ridge_models(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
-    base = Pipeline([
-        ("scaler", StandardScaler()),
-        ("ridge", Ridge(random_state=random_state)),
-    ])
+    base = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("ridge", Ridge(random_state=random_state)),
+        ]
+    )
     return {
         "arousal": _fit_single_target_generic(
-            X_train, y_ar_train, X_val, y_ar_val,
+            X_train,
+            y_ar_train,
+            X_val,
+            y_ar_val,
             models_dir / "arousal_ridge.joblib",
-            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            base,
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
         "valence": _fit_single_target_generic(
-            X_train, y_val_train, X_val, y_val_val,
+            X_train,
+            y_val_train,
+            X_val,
+            y_val_val,
             models_dir / "valence_ridge.joblib",
-            Pipeline([
-                ("scaler", StandardScaler()),
-                ("ridge", Ridge(random_state=random_state)),
-            ]),
-            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            Pipeline(
+                [
+                    ("scaler", StandardScaler()),
+                    ("ridge", Ridge(random_state=random_state)),
+                ]
+            ),
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
     }
 
@@ -302,24 +328,43 @@ def train_elasticnet_models(
         dataset_path, models_dir, test_size, random_state
     )
     models_dir.mkdir(parents=True, exist_ok=True)
-    base = Pipeline([
-        ("scaler", StandardScaler()),
-        ("elasticnet", ElasticNet(random_state=random_state)),
-    ])
+    base = Pipeline(
+        [
+            ("scaler", StandardScaler()),
+            ("elasticnet", ElasticNet(random_state=random_state)),
+        ]
+    )
     return {
         "arousal": _fit_single_target_generic(
-            X_train, y_ar_train, X_val, y_ar_val,
+            X_train,
+            y_ar_train,
+            X_val,
+            y_ar_val,
             models_dir / "arousal_elasticnet.joblib",
-            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            base,
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
         "valence": _fit_single_target_generic(
-            X_train, y_val_train, X_val, y_val_val,
+            X_train,
+            y_val_train,
+            X_val,
+            y_val_val,
             models_dir / "valence_elasticnet.joblib",
-            Pipeline([
-                ("scaler", StandardScaler()),
-                ("elasticnet", ElasticNet(random_state=random_state)),
-            ]),
-            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            Pipeline(
+                [
+                    ("scaler", StandardScaler()),
+                    ("elasticnet", ElasticNet(random_state=random_state)),
+                ]
+            ),
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
     }
 
@@ -336,7 +381,9 @@ def train_xgboost_models(
 ) -> Dict[str, ModelMetrics]:
     """Train XGBoost regressors; one model per target. Requires xgboost."""
     if XGBRegressor is None:
-        raise ImportError("xgboost is required for train_xgboost_models. Install with: pip install xgboost")
+        raise ImportError(
+            "xgboost is required for train_xgboost_models. Install with: pip install xgboost"
+        )
     dataset_path = dataset_path or MODELING_DATASET_PATH
     models_dir = models_dir or MODELS_DIR
     param_distributions = param_distributions or XGB_PARAM_DISTRIBUTIONS
@@ -347,15 +394,30 @@ def train_xgboost_models(
     base = XGBRegressor(random_state=random_state, n_jobs=-1)
     return {
         "arousal": _fit_single_target_generic(
-            X_train, y_ar_train, X_val, y_ar_val,
+            X_train,
+            y_ar_train,
+            X_val,
+            y_ar_val,
             models_dir / "arousal_xgboost.joblib",
-            base, random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            base,
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
         "valence": _fit_single_target_generic(
-            X_train, y_val_train, X_val, y_val_val,
+            X_train,
+            y_val_train,
+            X_val,
+            y_val_val,
             models_dir / "valence_xgboost.joblib",
             XGBRegressor(random_state=random_state, n_jobs=-1),
-            random_state, tune_hyperparams, cv, n_iter, param_distributions,
+            random_state,
+            tune_hyperparams,
+            cv,
+            n_iter,
+            param_distributions,
         ),
     }
 
@@ -489,4 +551,3 @@ def format_all_metrics_table(all_metrics: Dict[str, Dict[str, ModelMetrics]]) ->
         sections.append(format_metrics_table(metrics))
         sections.append("")
     return "\n".join(sections).strip()
-
