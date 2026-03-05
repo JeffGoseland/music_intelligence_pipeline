@@ -6,6 +6,20 @@ An agentic ML pipeline demo that turns **raw audio → structured features → e
 
 ---
 
+## Where we're at
+
+| Phase | Status | Notes |
+|-------|--------|--------|
+| **1. Data & feature pipeline** | Done | Enrich → `song_features.csv`, validation, full pipeline with checkpointing |
+| **2. Emotion prediction** | Done | Train (RF, Ridge, ElasticNet, XGBoost), versioned models `models/<run_id>/`, predictions → `emotion_predictions.csv`, MLOps (metrics, run_info, resume) |
+| **3. Semantic layer** | Documented | Tag set and rules in [docs/SEMANTIC_LAYER.md](docs/SEMANTIC_LAYER.md); code module (e.g. `emotion_tags.py`) to be added |
+| **4. AI Music Analyst** | Planned | Natural-language queries over emotion data |
+| **5. Visualization** | Planned | Emotion map, clusters |
+
+**Run the pipeline:** From project root, `python3 scripts/run_full_pipeline.py` (resume) or `python3 scripts/run_full_pipeline.py --force` (full run). See [docs/MLOPS.md](docs/MLOPS.md) for stages, artifacts, and checkpointing.
+
+---
+
 ## Purpose — Why use this tool?
 
 **For someone using it:** The tool lets you **explore and recommend music by how it feels**, not just by genre or metadata. You can:
@@ -74,9 +88,9 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 
 **Validation:** After building or re-running enrich, run `python3 scripts/validate_song_features.py` to check schema, row count, and tempo/key coverage.
 
-**Run from start to finish:** To rebuild all pipeline outputs and validate in one go (enrich → labels + join → train models → emotion_predictions → validate), run `python3 scripts/run_full_pipeline.py` from the project root. Requires `data/audio/`, `data/deam_csvs/` to be populated; takes several minutes (audio processing + model training). A run manifest is written to `data/processed/pipeline_run.json` for traceability.
+**Run from start to finish:** From the project root, run `python3 scripts/run_full_pipeline.py` (resume from last run, skips completed steps) or `python3 scripts/run_full_pipeline.py --force` (run all steps). Requires `data/audio/`, `data/deam_csvs/`; takes several minutes. Writes run manifest to `data/processed/pipeline_run.json` and checkpoints to `data/processed/.checkpoints/`.
 
-**MLOps:** Pipeline stages (feature engineering, model generation), artifact paths, validation gates, and how to run individual steps are in **[docs/MLOPS.md](docs/MLOPS.md)**.
+**MLOps:** Stages, versioned model paths (`models/<run_id>/`), validation gates, and per-step commands are in **[docs/MLOPS.md](docs/MLOPS.md)**.
 
 **Key idea:** This table is the **ML feature layer**, reusable across models.
 
@@ -105,7 +119,7 @@ Phase 2 uses **XGBoost** (one regressor per target) as the **production** emotio
 - **Inputs:** 11 numeric features from `modeling_dataset.csv`:  
   `spectral_centroid`, `energy`, `mfcc_coef1`, `auditory_band_variance`, `spectral_rolloff50`, `zcr`, `spectral_flux`, `spectral_variance`, `spectral_entropy`, `spectral_harmonicity`, `tempo_bpm`.
 - **Targets:** DEAM **arousal** and **valence** labels (per-song averages).
-- **Training:** 80/20 train/holdout split; **5-fold RandomizedSearchCV** on the training set for hyperparameters; best estimator refit on full training data. Saved models: `models/arousal_xgboost.joblib`, `models/valence_xgboost.joblib`.
+- **Training:** 80/20 train/holdout split; **5-fold RandomizedSearchCV** on the training set for hyperparameters; best estimator refit on full training data. Models are saved under **versioned** dirs: `models/<run_id>/` (e.g. `arousal_xgboost.joblib`, `valence_xgboost.joblib`, plus `training_metrics.txt` and `run_info.json`).
 
 **Holdout results (XGBoost, ~1,800 songs):**
 
@@ -121,7 +135,7 @@ Phase 2 uses **XGBoost** (one regressor per target) as the **production** emotio
 - Predictions are **good for relative use** (rank songs by mood, build playlists, emotion maps) and **not for exact 1–9 scores** — typical error is about one point on the scale; ~40% of variance is explained, the rest is label noise and missing signal.
 
 **How to train and reproduce metrics:**  
-Run `python3 scripts/train_emotion_models.py` from the project root. The script trains all four model types (RandomForest, Ridge, ElasticNet, XGBoost) with CV tuning and prints a metrics table per type. Trained models are written under `models/` (git-ignored).
+Run `python3 scripts/train_emotion_models.py` from the project root. The script trains all four model types (RandomForest, Ridge, ElasticNet, XGBoost) with CV tuning, prints a metrics table, and writes models plus `training_metrics.txt` and `run_info.json` to `models/<run_id>/` (git-ignored). Standalone predict uses the latest run; the full pipeline uses the run it just trained.
 
 **Key idea:** The model **enriches the feature store** with semantic predictions for downstream systems (semantic layer, analyst agent, emotion map).
 

@@ -9,6 +9,7 @@ and returns metrics for comparison.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Literal, Tuple
 
@@ -376,7 +377,16 @@ def _load_and_split(
     X = df[list(FEATURE_COLUMNS)].to_numpy(dtype=float)
     y_arousal = df["arousal"].to_numpy(dtype=float)
     y_valence = df["valence"].to_numpy(dtype=float)
-    valid = (~np.isnan(X).any(axis=1)) & ~np.isnan(y_arousal) & ~np.isnan(y_valence)
+    # Impute feature NaNs with column median so all-NaN columns (e.g. tempo_bpm) don't drop all rows
+    for j in range(X.shape[1]):
+        col = X[:, j].copy()
+        if np.isnan(col).any():
+            med = np.nanmedian(col)
+            if np.isnan(med):
+                med = 0.0  # all-NaN column: use 0
+            col = np.where(np.isnan(col), med, col)
+            X[:, j] = col
+    valid = ~np.isnan(y_arousal) & ~np.isnan(y_valence)
     if not valid.all():
         n_dropped = int((~valid).sum())
         X = X[valid]
@@ -394,21 +404,29 @@ def _load_and_split(
 def train_all_models(
     dataset_path: Path | None = None,
     models_dir: Path | None = None,
+    run_id: str | None = None,
     test_size: float = 0.2,
     random_state: int = 42,
     tune_hyperparams: bool = True,
     cv: int = 5,
     n_iter: int = 64,
     include_xgboost: bool = True,
-) -> Dict[str, Dict[str, ModelMetrics]]:
+) -> Tuple[Dict[str, Dict[str, ModelMetrics]], str, Path]:
     """
     Train RandomForest, Ridge, ElasticNet, and (optionally) XGBoost with CV tuning.
-    Returns a nested dict: model_type -> { "arousal" -> ModelMetrics, "valence" -> ModelMetrics }.
+    Saves models under models/<run_id>/ to avoid silent overwrites.
+    Returns (all_metrics, run_id, versioned_models_dir).
     """
+    base_dir = models_dir or MODELS_DIR
+    if run_id is None:
+        run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    versioned_dir = base_dir / run_id
+    versioned_dir.mkdir(parents=True, exist_ok=True)
+
     out: Dict[str, Dict[str, ModelMetrics]] = {}
     out["random_forest"] = train_random_forest_models(
         dataset_path=dataset_path,
-        models_dir=models_dir,
+        models_dir=versioned_dir,
         test_size=test_size,
         random_state=random_state,
         tune_hyperparams=tune_hyperparams,
@@ -417,7 +435,7 @@ def train_all_models(
     )
     out["ridge"] = train_ridge_models(
         dataset_path=dataset_path,
-        models_dir=models_dir,
+        models_dir=versioned_dir,
         test_size=test_size,
         random_state=random_state,
         tune_hyperparams=tune_hyperparams,
@@ -426,7 +444,7 @@ def train_all_models(
     )
     out["elasticnet"] = train_elasticnet_models(
         dataset_path=dataset_path,
-        models_dir=models_dir,
+        models_dir=versioned_dir,
         test_size=test_size,
         random_state=random_state,
         tune_hyperparams=tune_hyperparams,
@@ -436,14 +454,14 @@ def train_all_models(
     if include_xgboost and XGBRegressor is not None:
         out["xgboost"] = train_xgboost_models(
             dataset_path=dataset_path,
-            models_dir=models_dir,
+            models_dir=versioned_dir,
             test_size=test_size,
             random_state=random_state,
             tune_hyperparams=tune_hyperparams,
             cv=cv,
             n_iter=n_iter,
         )
-    return out
+    return out, run_id, versioned_dir
 
 
 def format_metrics_table(metrics: Dict[str, ModelMetrics]) -> str:

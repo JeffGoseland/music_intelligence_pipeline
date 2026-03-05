@@ -13,7 +13,7 @@ from joblib import load
 
 from ..config.data_paths import (
     EMOTION_PREDICTIONS_PATH,
-    MODELS_DIR,
+    get_latest_models_dir,
     SONG_FEATURES_PATH,
 )
 from ..modeling.train_emotion_models import FEATURE_COLUMNS
@@ -31,7 +31,7 @@ def run_emotion_predictions(
     are left as-is; XGBoost handles them. Creates output_path parent dir if needed.
     """
     song_features_path = song_features_path or SONG_FEATURES_PATH
-    models_dir = models_dir or MODELS_DIR
+    models_dir = models_dir or get_latest_models_dir()
     output_path = output_path or EMOTION_PREDICTIONS_PATH
 
     df = pd.read_csv(song_features_path)
