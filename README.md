@@ -108,6 +108,37 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 | `predicted_valence` | Model output |
 | `emotion_cluster` | (Optional) e.g. calm / energetic / tense / joyful |
 
+### Current baseline model (RandomForest)
+
+Phase 2 currently uses a **RandomForestRegressor** (one model for arousal, one for valence) trained on:
+
+- **Inputs:** 11 numeric features from `modeling_dataset.csv`  
+  (`spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm`).
+- **Targets:** DEAM **arousal** and **valence** labels aggregated per song.
+- **Training procedure:**  
+  - 80/20 train/holdout split on songs.  
+  - **5-fold RandomizedSearchCV** on the training split to tune RandomForest hyperparameters.  
+  - Best model refit on the full training split; metrics reported on the untouched 20% holdout.
+
+On the current DEAM subset (~1,800 songs), the tuned RandomForest achieves on the holdout set:
+
+- **Arousal:** RMSE ≈ **0.99**, R² ≈ **0.42**, Pearson r ≈ **0.65**  
+- **Valence:** RMSE ≈ **0.93**, R² ≈ **0.40**, Pearson r ≈ **0.63**
+
+Interpretation:
+
+- RMSE ≈ **1.0** on a **1–9** scale → predictions are typically within about **one point** of the average human rating.  
+- R² ≈ **0.4** → the model explains ~**40% of the variance** in perceived arousal/valence; the rest is listener disagreement and factors not captured by these features.  
+- Pearson r ≈ **0.63–0.65** → predictions track the *ordering* of songs by mood well, which is enough to build **ranked, mood-based playlists and an emotion map**, even if single-song scores are not perfect.
+
+**How to reproduce metrics:**  
+Run `python3 scripts/train_emotion_models.py` from the project root. The script prints a CSV-style summary with RMSE, R², Pearson r, CV RMSE, and the model paths in `models/`.
+
+**Next planned models (for comparison):**
+
+- **Ridge / ElasticNet Regression:** linear, regularized baselines to show how much non-linearity helps.  
+- **XGBoost / gradient-boosted trees:** stronger tree ensemble to probe the performance ceiling on this feature set.
+
 **Key idea:** The model **enriches the feature store** with semantic predictions for downstream systems.
 
 ---
