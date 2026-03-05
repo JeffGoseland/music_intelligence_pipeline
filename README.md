@@ -82,6 +82,10 @@ Raw Audio
 
 So the CSV is **song + statistics only** — identifiers and numeric features ready for ML; no embedded audio or long time-series.
 
+**Enrich step (optional):** Run `python scripts/run_enrich_pipeline.py` to produce a **richer** table: **10 DEAM core features** (spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity) plus **tempo (BPM)** and **musical key** extracted from audio, and a **genre** column (set to `unknown`; DEAM has no genre labels). Output: `data/processed/song_features.csv` with 14 columns.
+
+**Data dictionary:** Column names, types, sources, and definitions for all pipeline outputs are in **[docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md)**. Consult it before Phase 2 and for downstream use.
+
 **Key idea:** This table is the **ML feature layer**, reusable across models.
 
 ---

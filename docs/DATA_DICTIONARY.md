@@ -1,0 +1,76 @@
+# Data dictionary
+
+Defines the schema and meaning of pipeline output files. Use this before Phase 2 (and for downstream consumers) to interpret `song_features.csv` and, later, `emotion_predictions.csv`.
+
+---
+
+## File: `data/processed/song_features.csv`
+
+**Purpose:** One row per song; ML-ready feature layer plus tempo, genre, and key. Produced by the Phase 1 feature pipeline and enrich step.
+
+**Row count:** One per DEAM feature CSV (e.g. 1,802).  
+**Primary key:** `song_id` (string; matches DEAM file stem and audio filename stem).
+
+| Column | Type | Source | Description |
+|--------|------|--------|-------------|
+| **song_id** | string | DEAM / audio | Track identifier. From DEAM feature filename stem (e.g. `2.csv` → `2`) and audio filename stem (e.g. `746.mp3` → `746`). Used to join DEAM features with audio-derived fields. |
+| **spectral_centroid** | float | DEAM | Spectral brightness (Hz). Mean over time of `pcm_fftMag_spectralCentroid_sma_amean`. Higher = brighter tone. |
+| **energy** | float | DEAM | Perceptual energy (RMS). Mean over time of `pcm_RMSenergy_sma_amean`. Typical range ~0–1; higher = louder. |
+| **mfcc_mean** | float | DEAM | Mean of first MFCC over time (`pcm_fftMag_mfcc_sma[1]_amean`). Captures coarse spectral shape. |
+| **chroma_variance** | float | DEAM | Variance across 26 filterband (Rfilt) means. Proxy for pitch-class spread; higher = more spread. |
+| **spectral_rolloff50** | float | DEAM | Frequency below which 50% of spectral energy lies (Hz). Mean over time of `pcm_fftMag_spectralRollOff50.0_sma_amean`. |
+| **zcr** | float | DEAM | Zero-crossing rate. Mean over time of `pcm_zcr_sma_amean`. Higher often indicates noisiness or percussive content. |
+| **spectral_flux** | float | DEAM | Rate of change of spectrum over time. Mean of `pcm_fftMag_spectralFlux_sma_amean`. |
+| **spectral_variance** | float | DEAM | Variance of the spectrum. Mean of `pcm_fftMag_spectralVariance_sma_amean`. |
+| **spectral_entropy** | float | DEAM | Spectral entropy. Mean of `pcm_fftMag_spectralEntropy_sma_amean`. |
+| **spectral_harmonicity** | float | DEAM | Harmonic-to-noise ratio. Mean of `pcm_fftMag_spectralHarmonicity_sma_amean`. |
+| **tempo_bpm** | float | Audio | Beats per minute from audio (librosa beat tracking). May be NaN if extraction failed or no audio file matched. Typical range ~40–250. |
+| **genre** | string | Placeholder | Always `"unknown"` in current pipeline; DEAM does not provide genre. Reserved for future tag or classifier. |
+| **key** | string | Audio | Estimated musical key (e.g. `C major`, `A minor`). From chroma + Krumhansl–Schmuckler key profiles. `"unknown"` if extraction failed or no audio matched. |
+
+**Missing values:**
+- DEAM-derived columns: may be NaN if the source DEAM CSV lacked that column or had invalid values.
+- `tempo_bpm`: NaN when no matching audio file or when beat tracking failed.
+- `key`: `"unknown"` when no matching audio or when key estimation failed.
+- `genre`: always `"unknown"` until an external source or classifier is added.
+
+**Source pipeline steps:**
+1. DEAM feature CSVs (`data/deam_csvs/features/*.csv`) → per-song mean (and chroma_variance from Rfilt) → 10 DEAM columns.
+2. Audio files (`data/audio/*.mp3`) → tempo (librosa), key (chroma + key profiles) → tempo_bpm, key.
+3. Merge on song_id (left join); add genre = "unknown".
+
+---
+
+## File: `data/processed/emotion_predictions.csv` (Phase 2)
+
+**Purpose:** One row per song; predicted arousal and valence (and optional emotion cluster). Produced by Phase 2 emotion model.
+
+**Planned columns (to be updated after Phase 2):**
+
+| Column | Type | Source | Description |
+|--------|------|--------|-------------|
+| **song_id** | string | Join key | Same as in song_features.csv. |
+| **predicted_arousal** | float | Model | Predicted arousal (energy/intensity). |
+| **predicted_valence** | float | Model | Predicted valence (positive vs negative). |
+| **emotion_cluster** | string | Optional | Label such as calm / energetic / tense / joyful. |
+
+*(This section will be filled in when Phase 2 is implemented.)*
+
+---
+
+## Reference: DEAM source columns
+
+The 10 DEAM-derived columns in `song_features.csv` are aggregated from the following OpenSMILE / Geneva minimal feature set columns (one CSV per song, `;` separator, frame-level):
+
+- `pcm_fftMag_spectralCentroid_sma_amean`
+- `pcm_RMSenergy_sma_amean`
+- `pcm_fftMag_mfcc_sma[1]_amean`
+- `audSpec_Rfilt_sma[0]_amean` … `audSpec_Rfilt_sma[25]_amean` (chroma_variance = variance of their means)
+- `pcm_fftMag_spectralRollOff50.0_sma_amean`
+- `pcm_zcr_sma_amean`
+- `pcm_fftMag_spectralFlux_sma_amean`
+- `pcm_fftMag_spectralVariance_sma_amean`
+- `pcm_fftMag_spectralEntropy_sma_amean`
+- `pcm_fftMag_spectralHarmonicity_sma_amean`
+
+Aggregation: **mean over time** (all frames in the song’s DEAM feature CSV), except chroma_variance (variance across the 26 Rfilt band means).
