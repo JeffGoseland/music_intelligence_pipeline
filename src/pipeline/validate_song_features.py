@@ -1,8 +1,9 @@
 """
-Validate data/processed/song_features.csv against the data dictionary schema.
+Validate data/processed/song_features.csv, deam_labels.csv, and modeling_dataset.csv.
 
-Checks: required columns, dtypes, row count, duplicate song_id, NaN counts,
-optional tempo range and key coverage. Exits 0 if all required checks pass, 1 otherwise.
+Song features: required columns, dtypes, row count, duplicate song_id, NaN counts,
+tempo/key coverage. DEAM labels: song_id, arousal, valence; no duplicates; numeric.
+Modeling dataset: song_features columns + arousal, valence; inner-join consistency.
 """
 
 from pathlib import Path
@@ -131,22 +132,138 @@ def validate_song_features(csv_path: Path | None = None) -> tuple[bool, list[str
     return all_passed, errors, info
 
 
+# DEAM labels: required columns
+DEAM_LABELS_COLUMNS = ["song_id", "arousal", "valence"]
+
+
+def _default_deam_labels_path() -> Path:
+    try:
+        from ..config.data_paths import DEAM_LABELS_PATH
+        return DEAM_LABELS_PATH
+    except ImportError:
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return project_root / "data" / "processed" / "deam_labels.csv"
+
+
+def validate_deam_labels(csv_path: Path | None = None) -> tuple[bool, list[str], list[str]]:
+    """Validate deam_labels.csv. Returns (all_passed, errors, info_messages)."""
+    csv_path = csv_path or _default_deam_labels_path()
+    errors: list[str] = []
+    info: list[str] = []
+
+    if not csv_path.exists():
+        errors.append(f"File not found: {csv_path}")
+        return False, errors
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        errors.append(f"Could not read CSV: {e}")
+        return False, errors
+
+    missing = [c for c in DEAM_LABELS_COLUMNS if c not in df.columns]
+    if missing:
+        errors.append(f"Missing columns: {missing}")
+    if len(df) == 0:
+        errors.append("Table is empty")
+    else:
+        info.append(f"Row count: {len(df)}")
+    if "song_id" in df.columns and df["song_id"].duplicated().any():
+        errors.append(f"Duplicate song_id: {df['song_id'].duplicated().sum()} rows")
+    for col in ("arousal", "valence"):
+        if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):
+            errors.append(f"Column '{col}' should be numeric, got {df[col].dtype}")
+    return len(errors) == 0, errors, info
+
+
+def _default_modeling_dataset_path() -> Path:
+    try:
+        from ..config.data_paths import MODELING_DATASET_PATH
+        return MODELING_DATASET_PATH
+    except ImportError:
+        project_root = Path(__file__).resolve().parent.parent.parent
+        return project_root / "data" / "processed" / "modeling_dataset.csv"
+
+
+def validate_modeling_dataset(csv_path: Path | None = None) -> tuple[bool, list[str], list[str]]:
+    """Validate modeling_dataset.csv (song_features + arousal, valence). Returns (all_passed, errors, info)."""
+    csv_path = csv_path or _default_modeling_dataset_path()
+    errors: list[str] = []
+    info: list[str] = []
+
+    if not csv_path.exists():
+        errors.append(f"File not found: {csv_path}")
+        return False, errors
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        errors.append(f"Could not read CSV: {e}")
+        return False, errors
+
+    required = REQUIRED_COLUMNS + ["arousal", "valence"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        errors.append(f"Missing columns: {missing}")
+    if len(df) == 0:
+        errors.append("Table is empty")
+    else:
+        info.append(f"Row count: {len(df)}")
+    if "song_id" in df.columns and df["song_id"].duplicated().any():
+        errors.append(f"Duplicate song_id: {df['song_id'].duplicated().sum()} rows")
+    for col in ("arousal", "valence"):
+        if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):
+            errors.append(f"Column '{col}' should be numeric, got {df[col].dtype}")
+    return len(errors) == 0, errors, info
+
+
 def main() -> int:
-    """Run validation and print results. Return 0 if passed, 1 otherwise."""
-    passed, errors, info = validate_song_features()
+    """Run validation for song_features, then deam_labels and modeling_dataset if present. Return 0 if all passed, 1 otherwise."""
+    all_passed = True
+    sf_path = _default_csv_path()
+    dl_path = _default_deam_labels_path()
+    md_path = _default_modeling_dataset_path()
+
+    # 1) song_features (required for pipeline)
+    print("--- song_features.csv ---")
+    passed, errors, info = validate_song_features(sf_path)
     if errors:
-        print("Errors:")
         for m in errors:
-            print("  ", m)
+            print("  Error:", m)
+        all_passed = False
     if info:
-        print("Info:")
         for m in info:
             print("  ", m)
-    if passed:
-        print("Validation: PASSED")
-    else:
-        print("Validation: FAILED")
-    return 0 if passed else 1
+    print("song_features: PASSED" if passed else "song_features: FAILED")
+
+    # 2) deam_labels (Phase 2)
+    if dl_path.exists():
+        print("\n--- deam_labels.csv ---")
+        passed, errors, info = validate_deam_labels(dl_path)
+        if errors:
+            for m in errors:
+                print("  Error:", m)
+            all_passed = False
+        if info:
+            for m in info:
+                print("  ", m)
+        print("deam_labels: PASSED" if passed else "deam_labels: FAILED")
+
+    # 3) modeling_dataset (Phase 2)
+    if md_path.exists():
+        print("\n--- modeling_dataset.csv ---")
+        passed, errors, info = validate_modeling_dataset(md_path)
+        if errors:
+            for m in errors:
+                print("  Error:", m)
+            all_passed = False
+        if info:
+            for m in info:
+                print("  ", m)
+        print("modeling_dataset: PASSED" if passed else "modeling_dataset: FAILED")
+
+    print("\nOverall:", "PASSED" if all_passed else "FAILED")
+    return 0 if all_passed else 1
 
 
 if __name__ == "__main__":

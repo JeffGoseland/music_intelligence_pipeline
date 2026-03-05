@@ -41,6 +41,36 @@ Defines the schema and meaning of pipeline output files. Use this before Phase 2
 
 ---
 
+## File: `data/processed/deam_labels.csv` (Phase 2)
+
+**Purpose:** One row per song; DEAM ground-truth arousal and valence for training the emotion model. Produced by Phase 2 step 1 (DEAM annotations loader).
+
+**Row count:** One per song present in DEAM annotations (song-level static or aggregated from dynamic).  
+**Primary key:** `song_id` (string; matches DEAM annotation song IDs).
+
+| Column | Type | Source | Description |
+|--------|------|--------|-------------|
+| **song_id** | string | DEAM | Track identifier; matches song_features.csv and DEAM annotation files. |
+| **arousal** | float | DEAM | Averaged arousal (intensity/activation). Typical range 1–9 in DEAM. |
+| **valence** | float | DEAM | Averaged valence (positive vs negative). Typical range 1–9 in DEAM. |
+
+**Source:** `data/deam_csvs/annotations/` — song-level static CSVs (`static_annotations_averaged_songs_*.csv`) preferred; else dynamic per-second arousal.csv/valence.csv aggregated to mean per song.
+
+---
+
+## File: `data/processed/modeling_dataset.csv` (Phase 2)
+
+**Purpose:** One row per song with both features and labels; used to train the arousal/valence model. Inner join of song_features.csv and deam_labels.csv.
+
+**Row count:** Intersection of song_features and deam_labels (songs that have both).  
+**Primary key:** `song_id`.
+
+**Columns:** All columns from `song_features.csv` (14 columns) plus **arousal** and **valence** from `deam_labels.csv` (16 columns total).
+
+**Source:** Phase 2 step 2: `run_build_modeling_dataset()` joins song_features + deam_labels on song_id (inner).
+
+---
+
 ## File: `data/processed/emotion_predictions.csv` (Phase 2)
 
 **Purpose:** One row per song; predicted arousal and valence (and optional emotion cluster). Produced by Phase 2 emotion model.
