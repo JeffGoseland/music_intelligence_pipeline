@@ -11,6 +11,7 @@ Tempo, genre, key are added in the enrich step from audio.
 """
 
 from pathlib import Path
+import sys
 import pandas as pd
 
 # DEAM CSV column names (OpenSMILE / Geneva minimal feature set)
@@ -154,9 +155,7 @@ def run_feature_pipeline(
 
 
 if __name__ == "__main__":
-    import sys
     from ..config.data_paths import SONG_FEATURES_PATH
-    out_path = SONG_FEATURES_PATH
-    df = run_feature_pipeline(output_path=out_path)
-    print(f"Wrote {len(df)} rows to {out_path}", file=sys.stderr)
+    df = run_feature_pipeline(output_path=SONG_FEATURES_PATH)
+    print(f"Wrote {len(df)} rows to {SONG_FEATURES_PATH}", file=sys.stderr)
     print(df.head())

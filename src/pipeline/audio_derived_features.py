@@ -6,46 +6,114 @@ Returns DataFrame: song_id, tempo_bpm, key (e.g. "C major", "A minor").
 """
 
 from pathlib import Path
+import sys
 import numpy as np
 import pandas as pd
 
 # Krumhansl-Schmuckler key profiles (12 pitch classes C, C#, D, ..., B)
-# Major and minor; order matches librosa chroma: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
-MAJOR_PROFILE = np.array(
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+# Order matches librosa chroma: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+_MAJOR_RAW = np.array(
+    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], dtype=float
 )
-MINOR_PROFILE = np.array(
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+_MINOR_RAW = np.array(
+    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17], dtype=float
 )
+# Normalize to unit norm so cosine similarity is in [0, 1]
+MAJOR_PROFILE = _MAJOR_RAW / (np.linalg.norm(_MAJOR_RAW) + 1e-12)
+MINOR_PROFILE = _MINOR_RAW / (np.linalg.norm(_MINOR_RAW) + 1e-12)
 PITCH_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
 def _estimate_key(chroma: np.ndarray) -> str:
-    """Estimate key from chroma vector (12,) using Krumhansl-Schmuckler profiles."""
-    if chroma.size != 12 or not np.any(chroma):
+    """
+    Estimate key from chroma vector (12,) using Krumhansl-Schmuckler profiles.
+    Uses cosine similarity (normalized chroma vs rotated key profile).
+    Fallback: if no profile wins, use pitch class with max energy as root (major).
+    """
+    if chroma is None or chroma.size != 12:
         return "unknown"
-    chroma = chroma.astype(float)
-    chroma = chroma / (np.linalg.norm(chroma) + 1e-8)
-    best_corr = -np.inf
+    chroma = np.asarray(chroma, dtype=float).ravel()[:12]
+    chroma = np.nan_to_num(chroma, nan=0.0, posinf=0.0, neginf=0.0)
+    if not np.any(chroma > 0):
+        return "unknown"
+    norm = np.linalg.norm(chroma)
+    if norm < 1e-12:
+        norm = np.max(chroma) + 1e-12
+    chroma = chroma / norm
+    best_score = -np.inf
     best_key = "unknown"
     for shift in range(12):
         major_rot = np.roll(MAJOR_PROFILE, shift)
         minor_rot = np.roll(MINOR_PROFILE, shift)
-        c_maj = np.corrcoef(chroma, major_rot)[0, 1]
-        c_min = np.corrcoef(chroma, minor_rot)[0, 1]
-        if np.isfinite(c_maj) and c_maj > best_corr:
-            best_corr = c_maj
+        score_maj = float(np.dot(chroma, major_rot))
+        score_min = float(np.dot(chroma, minor_rot))
+        if np.isfinite(score_maj) and score_maj > best_score:
+            best_score = score_maj
             best_key = f"{PITCH_NAMES[shift]} major"
-        if np.isfinite(c_min) and c_min > best_corr:
-            best_corr = c_min
+        if np.isfinite(score_min) and score_min > best_score:
+            best_score = score_min
             best_key = f"{PITCH_NAMES[shift]} minor"
+    # Fallback: pick root as pitch class with highest chroma
+    if best_key == "unknown":
+        root_idx = int(np.argmax(chroma))
+        best_key = f"{PITCH_NAMES[root_idx]} major"
     return best_key
 
 
-def extract_tempo_and_key(audio_path: Path, sr: int = 22050, duration: float = 30.0) -> dict:
+def _chroma_vector_for_key(y: np.ndarray, sr: int) -> np.ndarray | None:
+    """
+    Get a single 12-D chroma vector for key estimation.
+    Sum over time. Tries chroma_stft, then chroma_cqt, then chroma_cens.
+    Returns None only if all methods fail or return empty/zero chroma.
+    """
+    import librosa
+
+    hop = 2048
+    n_chroma = 12
+
+    def make_vector(chroma: np.ndarray) -> np.ndarray | None:
+        if chroma is None or chroma.size == 0:
+            return None
+        vec = np.sum(chroma, axis=1)
+        if vec.size != n_chroma or not np.any(vec > 0):
+            return None
+        return vec.astype(float)
+
+    # 1) chroma_stft (most portable)
+    try:
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        out = make_vector(chroma)
+        if out is not None:
+            return out
+    except Exception:
+        pass
+
+    # 2) chroma_cqt (often better for key, can fail on some systems)
+    try:
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        out = make_vector(chroma)
+        if out is not None:
+            return out
+    except Exception:
+        pass
+
+    # 3) chroma_cens (smoother, different backend)
+    try:
+        chroma = librosa.feature.chroma_cens(y=y, sr=sr, hop_length=hop, n_chroma=n_chroma)
+        out = make_vector(chroma)
+        if out is not None:
+            return out
+    except Exception:
+        pass
+
+    return None
+
+
+def extract_tempo_and_key(audio_path: Path, sr: int = 22050, duration: float = 45.0) -> dict:
     """
     Extract tempo (BPM) and key from one audio file.
     Returns dict with song_id, tempo_bpm, key. Uses first `duration` seconds for speed.
+    Key uses chroma_stft (fallback chroma_cqt) and Krumhansl–Schmuckler profiles.
     """
     import librosa
 
@@ -65,13 +133,16 @@ def extract_tempo_and_key(audio_path: Path, sr: int = 22050, duration: float = 3
     except Exception:
         tempo_bpm = float("nan")
 
-    # Key from chroma (CQT)
-    try:
-        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=2048)
-        chroma_mean = np.mean(chroma, axis=1)
-        key = _estimate_key(chroma_mean)
-    except Exception:
-        key = "unknown"
+    # Key from chroma: use middle segment to avoid silent intros/outros
+    n = len(y)
+    if n >= sr * 10:
+        mid_start = n // 4
+        mid_end = (3 * n) // 4
+        y_key = y[mid_start:mid_end]
+    else:
+        y_key = y
+    chroma_vec = _chroma_vector_for_key(y_key, sr)
+    key = _estimate_key(chroma_vec) if chroma_vec is not None else "unknown"
 
     return {"song_id": song_id, "tempo_bpm": tempo_bpm, "key": key}
 
@@ -106,7 +177,6 @@ def run_audio_derived_pipeline(
         row = extract_tempo_and_key(path)
         rows.append(row)
         if (i + 1) % 200 == 0:
-            import sys
             print(f"  audio: {i + 1}/{len(files)}", file=sys.stderr)
 
     return pd.DataFrame(rows)

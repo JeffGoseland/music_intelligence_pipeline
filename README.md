@@ -86,6 +86,8 @@ So the CSV is **song + statistics only** — identifiers and numeric features re
 
 **Data dictionary:** Column names, types, sources, and definitions for all pipeline outputs are in **[docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md)**. Consult it before Phase 2 and for downstream use.
 
+**Validation:** After building or re-running enrich, run `python scripts/validate_song_features.py` to check schema, row count, and tempo/key coverage.
+
 **Key idea:** This table is the **ML feature layer**, reusable across models.
 
 ---

@@ -26,7 +26,7 @@ Defines the schema and meaning of pipeline output files. Use this before Phase 2
 | **spectral_harmonicity** | float | DEAM | Harmonic-to-noise ratio. Mean of `pcm_fftMag_spectralHarmonicity_sma_amean`. |
 | **tempo_bpm** | float | Audio | Beats per minute from audio (librosa beat tracking). May be NaN if extraction failed or no audio file matched. Typical range ~40–250. |
 | **genre** | string | Placeholder | Always `"unknown"` in current pipeline; DEAM does not provide genre. Reserved for future tag or classifier. |
-| **key** | string | Audio | Estimated musical key (e.g. `C major`, `A minor`). From chroma + Krumhansl–Schmuckler key profiles. `"unknown"` if extraction failed or no audio matched. |
+| **key** | string | Audio | Estimated musical key (e.g. `C major`, `A minor`). Chroma (STFT, then CQT fallback) + Krumhansl–Schmuckler profiles; cosine similarity. `"unknown"` if extraction failed, no audio matched, or chroma was unusable. |
 
 **Missing values:**
 - DEAM-derived columns: may be NaN if the source DEAM CSV lacked that column or had invalid values.

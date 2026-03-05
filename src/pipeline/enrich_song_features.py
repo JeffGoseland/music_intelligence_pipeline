@@ -28,12 +28,7 @@ def run_enrich_pipeline(
     Creates output_path parent dir if needed. Songs without matching audio get NaN tempo_bpm
     and key "unknown". audio_limit: if set, only process this many audio files (for testing).
     """
-    from ..config.data_paths import (
-        FEATURES_CSV_DIR,
-        AUDIO_DIR,
-        PROCESSED_DIR,
-        SONG_FEATURES_PATH,
-    )
+    from ..config.data_paths import FEATURES_CSV_DIR, AUDIO_DIR, SONG_FEATURES_PATH
 
     features_dir = features_dir or FEATURES_CSV_DIR
     audio_dir = audio_dir or AUDIO_DIR

@@ -128,6 +128,7 @@ Phase 1 (features)  →  Phase 2 (model)  →  Phase 3 (semantic)  →  Phase 4 
 - [x] **Phase 1:** Path config (`src/config/data_paths.py`), DEAM feature loader (`src/pipeline/deam_feature_loader.py`), `data/processed/song_features.csv` (1,802 rows). Run: `python scripts/run_feature_pipeline.py` or `python -m src.pipeline.deam_feature_loader`.
 - [x] **Enrich step:** 10 DEAM core features + tempo (BPM), genre, key. `src/pipeline/deam_feature_loader.py` (rich=True), `src/pipeline/audio_derived_features.py` (tempo + key from audio), `src/pipeline/enrich_song_features.py` (merge + genre). Run: `python scripts/run_enrich_pipeline.py`. Columns: song_id, spectral_centroid, energy, mfcc_mean, chroma_variance, spectral_rolloff50, zcr, spectral_flux, spectral_variance, spectral_entropy, spectral_harmonicity, tempo_bpm, genre, key. Genre is "unknown" (DEAM has no genre).
 - [x] **Data dictionary:** [docs/DATA_DICTIONARY.md](DATA_DICTIONARY.md) documents all columns in `song_features.csv` (and placeholder for `emotion_predictions.csv`). Required reading before Phase 2.
+- [x] **Validation:** `python scripts/validate_song_features.py` checks schema, row count, duplicates, dtypes, and reports tempo/key coverage. Run after enrich to confirm data before Phase 2.
 
 ---
 
