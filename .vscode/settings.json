@@ -1,0 +1,6 @@
+{
+  "ruff.config": "${workspaceFolder}/pyproject.toml",
+  "ruff.lint.run": "onSave",
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticMode": "workspace"
+}
