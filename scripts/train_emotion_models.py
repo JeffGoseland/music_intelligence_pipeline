@@ -13,6 +13,7 @@ from src.modeling.train_emotion_models import format_all_metrics_table, train_al
 
 
 def _get_git_hash() -> str:
+    """Return short git HEAD hash for run_info, or 'unknown' if not a repo."""
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -24,6 +25,7 @@ def _get_git_hash() -> str:
 
 
 def main() -> int:
+    """Parse --fast, train all models, write metrics and run_info to versioned dir; exit 0."""
     parser = argparse.ArgumentParser(
         description="Train emotion models (RF, Ridge, ElasticNet, XGBoost)."
     )

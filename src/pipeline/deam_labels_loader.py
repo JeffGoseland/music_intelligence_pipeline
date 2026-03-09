@@ -20,6 +20,7 @@ STATIC_GLOB = "static_annotations_averaged_songs_*.csv"
 
 
 def _find_song_id_column(df: pd.DataFrame) -> str | None:
+    """Return column name that holds song identifier, or None if not found."""
     for cand in ("song_id", "song", "id", "songId"):
         if cand in df.columns:
             return cand
@@ -30,6 +31,7 @@ def _find_song_id_column(df: pd.DataFrame) -> str | None:
 
 
 def _find_arousal_column(df: pd.DataFrame) -> str | None:
+    """Return column name for arousal values, or None if not found."""
     for cand in ("arousal", "AM", "mean_arousal", "arousal_mean"):
         if cand in df.columns:
             return cand
@@ -40,6 +42,7 @@ def _find_arousal_column(df: pd.DataFrame) -> str | None:
 
 
 def _find_valence_column(df: pd.DataFrame) -> str | None:
+    """Return column name for valence values, or None if not found."""
     for cand in ("valence", "VM", "mean_valence", "valence_mean"):
         if cand in df.columns:
             return cand
@@ -50,6 +53,7 @@ def _find_valence_column(df: pd.DataFrame) -> str | None:
 
 
 def _load_static_song_level(annotations_dir: Path) -> pd.DataFrame | None:
+    """Load song-level static DEAM annotations (song_id, arousal, valence) if present."""
     song_level_dir = annotations_dir / SONG_LEVEL_SUBDIR
     if not song_level_dir.exists():
         return None
@@ -87,6 +91,7 @@ def _load_static_song_level(annotations_dir: Path) -> pd.DataFrame | None:
 
 
 def _load_dynamic_aggregated(annotations_dir: Path) -> pd.DataFrame | None:
+    """Load dynamic per-second arousal/valence CSVs and aggregate to mean per song."""
     dynamic_dir = annotations_dir / DYNAMIC_SUBDIR
     arousal_path = dynamic_dir / "arousal.csv"
     valence_path = dynamic_dir / "valence.csv"

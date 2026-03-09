@@ -101,6 +101,7 @@ def _compute_metrics(
     cv_rmse_mean: float | None = None,
     best_params: Dict[str, Any] | None = None,
 ) -> ModelMetrics:
+    """Compute RMSE, R², Pearson r and wrap in ModelMetrics for one target."""
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     r2 = float(r2_score(y_true, y_pred))
     if np.std(y_true) > 0 and np.std(y_pred) > 0:
@@ -132,6 +133,7 @@ def _fit_single_target_generic(
     n_iter: int,
     param_distributions: Dict[str, Any] | None,
 ) -> ModelMetrics:
+    """Fit one model (with optional RandomizedSearchCV), save to model_path, return metrics."""
     if tune_hyperparams and param_distributions:
         search = RandomizedSearchCV(
             base_estimator,
@@ -169,6 +171,7 @@ def _fit_single_target_generic(
 
 
 def _n_combinations(param_distributions: Dict[str, Any]) -> int:
+    """Return approximate number of parameter combinations for n_iter capping."""
     n = 1
     for v in param_distributions.values():
         n *= len(v) if hasattr(v, "__len__") else 10

@@ -16,6 +16,7 @@ from src.analyst import run_analyst  # noqa: E402
 
 
 def main() -> int:
+    """Run analyst with query from argv; print explanation and song_ids."""
     if len(sys.argv) < 2:
         print(
             'Usage: python3 scripts/run_analyst.py "Your question"',

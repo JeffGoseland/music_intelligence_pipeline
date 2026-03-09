@@ -27,6 +27,7 @@ import _bootstrap  # noqa: E402, F401 (side effect: sys.path)
 
 
 def _get_git_hash() -> str:
+    """Return short git HEAD hash for run manifest, or 'unknown' if not a repo."""
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -38,6 +39,7 @@ def _get_git_hash() -> str:
 
 
 def _write_manifest(manifest: dict, path: Path) -> None:
+    """Write pipeline run manifest JSON to path (creates parent dir if needed)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -52,6 +54,7 @@ def run_step(name: str, fn, *args, **kwargs):
 
 
 def main() -> int:
+    """Run full pipeline (enrich → labels+join → train → predict → validate); exit 0 iff all pass."""
     from src.config.data_paths import (
         PIPELINE_CHECKPOINT_DIR,
         PIPELINE_RUN_PATH,

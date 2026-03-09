@@ -78,6 +78,7 @@ def _load(pred_path: str, feat_path: str) -> pd.DataFrame:
 
 
 def _tempo_bucket(bpm: float) -> str:
+    """Map BPM to a tempo bucket label for colouring (e.g. Slow, Mid, Fast)."""
     if pd.isna(bpm):
         return "Unknown"
     if bpm < 80:
@@ -168,11 +169,14 @@ app_ui = ui.page_sidebar(
 
 
 def server(input, output, session):
+    """Shiny server: load data, sliders, filtered dataframe, emotion map plot, song table."""
+
     # ── Load data ──────────────────────────────────────────────────────────────
 
     @reactive.calc
     @reactive.event(input.load_btn, ignore_none=False)
     def raw_df() -> pd.DataFrame:
+        """Load predictions CSV and merge song_features metadata; compute tempo_bucket if present."""
         try:
             df = _load(input.pred_path(), input.feat_path())
             if "tempo_bpm" in df.columns:
@@ -187,6 +191,7 @@ def server(input, output, session):
     @output
     @render.ui
     def arousal_slider_ui():
+        """Build arousal range slider from data min/max (or placeholder if no data)."""
         df = raw_df()
         if df.empty or "predicted_arousal" not in df.columns:
             return ui.p("Load data to enable filters.", class_="text-muted small")
@@ -214,6 +219,7 @@ def server(input, output, session):
     @output
     @render.ui
     def valence_slider_ui():
+        """Build valence range slider from data min/max (or placeholder if no data)."""
         df = raw_df()
         if df.empty or "predicted_valence" not in df.columns:
             return ui.p("")
@@ -242,6 +248,7 @@ def server(input, output, session):
 
     @reactive.calc
     def filtered_df() -> pd.DataFrame:
+        """Subset raw_df by current arousal and valence slider ranges."""
         df = raw_df()
         if df.empty:
             return df
@@ -260,6 +267,7 @@ def server(input, output, session):
     @output
     @render.text
     def song_count():
+        """Return text like 'Showing N of M songs' for the current filter."""
         df_all = raw_df()
         df_filt = filtered_df()
         if df_all.empty:
@@ -271,6 +279,7 @@ def server(input, output, session):
     @output
     @render_plotly
     def emotion_map():
+        """Plot valence vs arousal scatter with quadrant shading and optional color-by grouping."""
         df = filtered_df()
 
         if df.empty:
@@ -398,6 +407,7 @@ def server(input, output, session):
         use_color = color_by in color_options and color_by in df.columns
 
         def _hover(row, extra_col=None, extra_val=None):
+            """Format hover text for one point (song_id, valence, arousal, optional extra)."""
             txt = f"<b>{row['song_id']}</b><br>Valence: {row[x_col]:.2f}<br>Arousal: {row[y_col]:.2f}"
             if extra_col:
                 txt += f"<br>{extra_col.replace('_', ' ').title()}: {extra_val}"
@@ -491,6 +501,7 @@ def server(input, output, session):
     @output
     @render.data_frame
     def song_table():
+        """DataGrid of filtered songs (song_id, predictions, key, tempo, genre when available)."""
         df = filtered_df()
         if df.empty:
             return render.DataGrid(pd.DataFrame())

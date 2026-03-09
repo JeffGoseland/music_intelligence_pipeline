@@ -60,6 +60,7 @@ def _rfilt_amean_columns(columns: list[str]) -> list[str]:
 
 
 def _safe_mean(df: pd.DataFrame, col: str) -> float:
+    """Return mean of column if present, else NaN."""
     if col in df.columns:
         return float(df[col].mean())
     return float("nan")

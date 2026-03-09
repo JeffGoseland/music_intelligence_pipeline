@@ -10,6 +10,7 @@ from src.semantic import filter_songs_by_tag, list_tags
 
 
 def main() -> int:
+    """Print tag counts and example song_ids for 'Calm Focus'; exit 0."""
     df = pd.read_csv(EMOTION_PREDICTIONS_PATH)
     print("Tag counts (songs with at least that tag):")
     for tag in list_tags():

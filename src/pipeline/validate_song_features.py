@@ -166,6 +166,7 @@ DEAM_LABELS_COLUMNS = ["song_id", "arousal", "valence"]
 
 
 def _default_deam_labels_path() -> Path:
+    """Resolve deam_labels.csv path for script or package use."""
     try:
         from ..config.data_paths import DEAM_LABELS_PATH
 
@@ -209,6 +210,7 @@ def validate_deam_labels(
 
 
 def _default_modeling_dataset_path() -> Path:
+    """Resolve modeling_dataset.csv path for script or package use."""
     try:
         from ..config.data_paths import MODELING_DATASET_PATH
 
@@ -256,6 +258,7 @@ EMOTION_PREDICTIONS_REQUIRED = ["song_id", "predicted_arousal", "predicted_valen
 
 
 def _default_emotion_predictions_path() -> Path:
+    """Resolve emotion_predictions.csv path for script or package use."""
     try:
         from ..config.data_paths import EMOTION_PREDICTIONS_PATH
 
