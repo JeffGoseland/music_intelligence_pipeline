@@ -40,4 +40,5 @@ def get_latest_models_dir() -> Path:
     ]
     if not subdirs:
         return MODELS_DIR
+    # run_id is YYYYMMDD_HHMMSS so lexicographic max = latest run
     return MODELS_DIR / max(subdirs)

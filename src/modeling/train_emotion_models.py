@@ -441,6 +441,7 @@ def _load_and_split(
         X = X[valid]
         y_arousal = y_arousal[valid]
         y_valence = y_valence[valid]
+    # Same X, test_size, random_state so train/val indices match for both targets (fair comparison).
     X_train, X_val, y_ar_train, y_ar_val = train_test_split(
         X, y_arousal, test_size=test_size, random_state=random_state
     )

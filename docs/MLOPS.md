@@ -52,7 +52,7 @@ Runs stages 1–5 in order. Exits 0 only if validation passes. Writes a run mani
 - **Predictions:** `data/processed/emotion_predictions.csv`.  
 - **Run manifest:** `data/processed/pipeline_run.json` (written by `run_full_pipeline.py`).
 
-Paths are centralized in `src/config/data_paths.py`.
+Paths are centralized in `src/config/data_paths.py`. For design rationale (e.g. song_id as string, same train/val split, XGBoost as production), see [docs/DECISIONS.md](DECISIONS.md).
 
 ---
 

@@ -77,6 +77,7 @@ def validate_song_features(
         return False, errors, []
 
     try:
+        # Force song_id to string so joins are consistent and we avoid "song_id dtype" info (see docs/DECISIONS.md).
         df = pd.read_csv(csv_path, dtype={"song_id": str})
     except Exception as e:
         errors.append(f"Could not read CSV: {e}")
